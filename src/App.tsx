@@ -141,6 +141,7 @@ export default function App() {
         status: 'waiting',
         words: roomWords,
         maxMembers: 10,
+        targetDistance: 100,
         createdAt: new Date().toISOString()
       });
 
@@ -185,71 +186,72 @@ export default function App() {
   };
 
   return (
-    // Foydalanuvchi talabi 8: Sayt umuman scrol bo'lmasin. Hamma ma'lumot scrol qilmasa ham chiroyli ko'rinsin!
-    <div className="h-screen h-[100dvh] max-h-screen max-h-[100dvh] overflow-hidden bg-[#070b14] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Sarlavha (Header: Barcha qo'shimcha bo'limlar va admin paneli o'chirilgan) */}
-      <Header
-        soundType={soundType}
-        onToggleSound={handleToggleSound}
-        activeRoomId={activeRoom?.id}
-        onLeaveRoom={handleLeaveCurrentRoom}
-        onGoHome={() => setViewState('home')}
-      />
+    // Foydalanuvchi talabi: bu sayt emas balki o'yin bo'lsin, telefonlarda ham vertikal va ortiqcha ma'lumotsiz
+    <div className="h-screen h-[100dvh] max-h-screen max-h-[100dvh] overflow-hidden bg-[#050914] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
+      {/* Sarlavha: FAQAT bosh menyu ('home') bo'lgandagina chiqadi. O'yin vaqtida o'chiriladi */}
+      {viewState === 'home' && (
+        <Header
+          soundType={soundType}
+          onToggleSound={handleToggleSound}
+          activeRoomId={activeRoom?.id}
+          onLeaveRoom={handleLeaveCurrentRoom}
+          onGoHome={() => setViewState('home')}
+        />
+      )}
 
-      {/* Asosiy maydon - Scrol bo'lmaydigan, to'liq ekranga moslashgan */}
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center max-w-6xl w-full mx-auto px-3 sm:px-6 py-2">
+      {/* Asosiy maydon */}
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center w-full max-w-6xl mx-auto px-2 sm:px-4 py-1">
         {/* Yuklanmoqda bildirishnomasi */}
         {loadingAction && (
-          <div className="mb-2 p-2 bg-cyan-950/60 border border-cyan-500/50 rounded-xl text-cyan-300 text-xs text-center font-medium animate-pulse flex items-center justify-center gap-2 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          <div className="mb-2 p-2 bg-emerald-950/70 border border-emerald-500/60 rounded-xl text-emerald-300 text-xs text-center font-bold animate-pulse flex items-center justify-center gap-2 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
             <span>{loadingAction}</span>
           </div>
         )}
 
         {/* Global xatolik */}
         {globalError && (
-          <div className="mb-2 p-2 bg-rose-950/70 border border-rose-500/60 rounded-xl text-rose-300 text-xs text-center font-medium shrink-0">
+          <div className="mb-2 p-2 bg-rose-950/80 border border-rose-500/70 rounded-xl text-rose-300 text-xs text-center font-bold shrink-0">
             {globalError}
           </div>
         )}
 
-        {/* Bosh sahifa: 3 ta bo'lim tanlovi */}
+        {/* BOSH SAHIFA: ARCADE O'YIN MENYUSI (Telefonlarda ham chiroyli vertikal) */}
         {viewState === 'home' && (
-          <div className="space-y-4 my-auto">
-            {/* Rasmiy logotip va brend bloki (Ixcham, yuqori sifatli va scrolsiz) */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#0c1427] to-[#080d19] border border-cyan-500/20 p-4 sm:p-5 shadow-xl">
+          <div className="space-y-3 sm:space-y-4 my-auto">
+            {/* O'yin sarlavhasi va rasmiy logotip */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#091823] via-[#08121d] to-[#040811] border-2 border-emerald-500/30 p-4 sm:p-5 shadow-2xl">
               <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="space-y-1.5 text-center sm:text-left">
-                  <div className="flex items-center justify-center sm:justify-start gap-1.5 text-[11px] text-cyan-400 font-semibold tracking-wider uppercase font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                    <span>Jonli Avtomobil Trassasi va Tez Yozish Platformasi</span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-[10px] text-emerald-400 font-extrabold uppercase font-mono tracking-widest">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>ONLINE TYPING RACING GAME · WORKING CODE</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-                    Type <span className="text-cyan-400">Groups</span>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tighter drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">
+                    TYPE <span className="text-emerald-400">GROUPS</span>
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-300 max-w-lg leading-relaxed">
-                    Mashhur sport avtomobillari bilan poyga trassasida klaviatura tezligingizni sinang.
-                    Ishlab chiquvchi: <strong className="text-cyan-300 font-semibold">WORKING CODE</strong>.
+                    Haqiqiy avtomobillar bilan jonli trassada poyga qiling va klaviatura tezligingizni oshiring.
                   </p>
                 </div>
 
-                {/* Rasmiy doiraviy logotip (Asl mutanosiblik, begona ramkasiz) */}
+                {/* Rasmiy logotip */}
                 <div className="shrink-0 flex flex-col items-center">
                   <img
                     src="/type-groups-logo.png"
                     alt="Type Groups Rasmiy Logotipi"
-                    className="w-20 h-20 sm:w-24 sm:h-24 object-contain rounded-full transition-transform hover:scale-105 duration-300"
+                    className="w-20 h-20 sm:w-24 sm:h-24 object-contain rounded-full transition-transform hover:scale-105 duration-300 filter drop-shadow-[0_0_15px_rgba(0,229,255,0.4)]"
                     width={96}
                     height={96}
                   />
-                  <span className="text-[10px] text-cyan-400/90 font-mono font-medium mt-1">
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1 tracking-wider">
                     WORKING CODE
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* 3 ta bo'lim orqali tanlov (Modal oynani chaqiradi) */}
+            {/* 3 ta bo'lim tanlovi */}
             <HomeModeSelector
               onStartSolo={handleStartSolo}
               onJoinGroup={handleJoinGroup}
@@ -258,7 +260,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 1-Bo'lim: Bir o'zim yozaman (Solo) */}
+        {/* 1-Bo'lim: Yakka poyga (Xuddi rasmdagidek sof o'yin ko'rinishida) */}
         {viewState === 'solo' && (
           <SoloRaceArena
             userName={currentUser.name}
@@ -267,7 +269,7 @@ export default function App() {
           />
         )}
 
-        {/* 2 & 3-Bo'lim: Vaqtinchalik multiplayer xona */}
+        {/* 2 & 3-Bo'lim: Guruhli multiplayer poyga (Sof o'yin ko'rinishida) */}
         {viewState === 'room' && activeRoom && (
           <MultiplayerRoom
             roomId={activeRoom.id}
@@ -280,8 +282,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Sokin Futer */}
-      <Footer />
+      {/* Futer: FAQAT bosh menyu ('home') da ko'rinadi */}
+      {viewState === 'home' && <Footer />}
     </div>
   );
 }

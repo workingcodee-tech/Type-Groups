@@ -61,6 +61,7 @@ export interface RaceStats {
   totalChars: number; // jami bosilgan belgilar soni
   timeSeconds: number; // qancha vaqtda yozgani (soniyada)
   timeLimitSeconds?: number; // belgilangan vaqt chegarasi (agar tanlangan bo'lsa)
+  distanceMeters?: number; // tanlangan poyga masofasi (100m, 500m, 1000m)
   wpmHistory: number[];
   consistency: number; // bir maromdalik
   keystrokes: number; // jami klaviatura bosilishlari

@@ -45,7 +45,7 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
 
   const [copied, setCopied] = React.useState(false);
   const handleShare = () => {
-    const text = `🏁 Type Groups poygasida ${stats.userRank}-oʻrinni egalladim!\n⏱️ Vaqt: ${stats.timeSeconds.toFixed(1)} soniya\n⌨️ Bosilgan belgilar: ${stats.totalChars} ta\n❌ Xatolar: ${stats.incorrectChars} ta\n⚡ Oʻrtacha samaradorlik: ${stats.wpm} WPM (${stats.accuracy}% aniqlik)\nWORKING CODE Type Groups da siz ham sinab koʻring!`;
+    const text = `🏁 Type Groups poygasida ${stats.userRank}-oʻrinni egalladim!\n🏎️ Masofa: ${stats.distanceMeters || 100} metr\n⏱️ Bosib oʻtish vaqti: ${stats.timeSeconds.toFixed(1)} soniya\n⌨️ Bosilgan belgilar: ${stats.totalChars} ta (${stats.correctChars} toʻgʻri)\n❌ Xatolar: ${stats.incorrectChars} ta\n⚡ Oʻrtacha tezlik: ${stats.wpm} WPM (${stats.accuracy}% aniqlik)\nType Groups da siz ham sinab koʻring!`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopied(true);
@@ -110,17 +110,17 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
             </div>
           </div>
 
-          {/* 2. Belgilangan soniyada nechta belgi bosgani */}
+          {/* 2. Bosib o'tilgan masofa va belgilar */}
           <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl text-center">
             <div className="flex items-center justify-center gap-1 text-slate-400 text-xs mb-1">
               <Hash className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Bosilgan Belgilar</span>
+              <span>Bosib Oʻtilgan Masofa</span>
             </div>
             <div className="text-2xl sm:text-3xl font-extrabold text-cyan-400 font-mono-numbers">
-              {stats.totalChars} <span className="text-xs text-slate-500 font-normal">ta</span>
+              {stats.distanceMeters || 100} <span className="text-xs text-slate-400 font-normal">metr</span>
             </div>
             <div className="text-[11px] text-slate-400 mt-1 font-mono-numbers">
-              Toʻgʻri: {stats.correctChars} ta
+              Belgilar: {stats.totalChars} ta ({stats.correctChars} toʻgʻri)
             </div>
           </div>
 
@@ -140,17 +140,17 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Qancha vaqtda yozgani */}
+          {/* 4. Masofani qancha vaqtda bosib o'tgani */}
           <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl text-center">
             <div className="flex items-center justify-center gap-1 text-slate-400 text-xs mb-1">
-              <Clock className="w-3.5 h-3.5 text-sky-400" />
-              <span>Sarflangan Vaqt</span>
+              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Bosib Oʻtish Vaqti</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono-numbers">
+            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono-numbers">
               {stats.timeSeconds.toFixed(1)}s
             </div>
             <div className="text-[11px] text-slate-400 mt-1 font-mono-numbers">
-              {stats.timeLimitSeconds ? `Chegara: ${stats.timeLimitSeconds}s` : `${stats.keystrokes} ta chertki`}
+              {stats.distanceMeters || 100}m masofani bosib oʻtdingiz
             </div>
           </div>
         </div>
