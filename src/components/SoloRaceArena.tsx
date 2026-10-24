@@ -15,22 +15,22 @@ interface SoloRaceArenaProps {
   onBack: () => void;
 }
 
-// 3 xil qiyinlik darajasidagi botlar parametrlari
+// 3 xil qiyinlik darajasidagi botlar parametrlari (foydalanuvchilar qulay yutishi uchun sezilarli sekinlashtirilgan)
 const BOT_CONFIGS: Record<DifficultyLevel, { id: string; name: string; carId: string; wpm: number; accuracy: number }[]> = {
   easy: [
-    { id: 'bot-1', name: 'Sokin Haydovchi', carId: 'malibu', wpm: 24, accuracy: 96 },
-    { id: 'bot-2', name: 'Shahar Mashinasi', carId: 'kia', wpm: 30, accuracy: 97 },
-    { id: 'bot-3', name: 'Asta Poygachi', carId: 'audi', wpm: 36, accuracy: 98 },
+    { id: 'bot-1', name: 'Sokin Haydovchi', carId: 'malibu', wpm: 10, accuracy: 95 },
+    { id: 'bot-2', name: 'Shahar Mashinasi', carId: 'kia', wpm: 14, accuracy: 96 },
+    { id: 'bot-3', name: 'Asta Poygachi', carId: 'audi', wpm: 18, accuracy: 97 },
   ],
   medium: [
-    { id: 'bot-1', name: 'Kruiz Poygachi', carId: 'bmw', wpm: 45, accuracy: 97 },
-    { id: 'bot-2', name: 'Nitro Mustang', carId: 'mustang', wpm: 52, accuracy: 98 },
-    { id: 'bot-3', name: 'Turbo AMG', carId: 'mers', wpm: 60, accuracy: 98 },
+    { id: 'bot-1', name: 'Kruiz Poygachi', carId: 'bmw', wpm: 22, accuracy: 96 },
+    { id: 'bot-2', name: 'Nitro Mustang', carId: 'mustang', wpm: 28, accuracy: 97 },
+    { id: 'bot-3', name: 'Turbo AMG', carId: 'mers', wpm: 34, accuracy: 98 },
   ],
   hard: [
-    { id: 'bot-1', name: 'Shadow Ferrari', carId: 'ferrari', wpm: 70, accuracy: 98 },
-    { id: 'bot-2', name: 'Hyper 911', carId: 'porsche', wpm: 80, accuracy: 99 },
-    { id: 'bot-3', name: 'Bugatti Phantom', carId: 'bugatti', wpm: 90, accuracy: 99 },
+    { id: 'bot-1', name: 'Shadow Ferrari', carId: 'ferrari', wpm: 42, accuracy: 98 },
+    { id: 'bot-2', name: 'Hyper 911', carId: 'porsche', wpm: 50, accuracy: 98 },
+    { id: 'bot-3', name: 'Bugatti Phantom', carId: 'bugatti', wpm: 58, accuracy: 99 },
   ],
 };
 
@@ -337,10 +337,10 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
           racers={racers}
           roomName={
             difficulty === 'easy'
-              ? 'Yakka Poyga (Oson Trassa · ~30 WPM)'
+              ? 'Yakka Poyga (Oson Trassa · ~10-18 WPM)'
               : difficulty === 'medium'
-              ? 'Yakka Poyga (Oʻrta Trassa · ~50 WPM)'
-              : 'Yakka Poyga (Qiyin Trassa · ~80 WPM)'
+              ? 'Yakka Poyga (Oʻrta Trassa · ~22-34 WPM)'
+              : 'Yakka Poyga (Qiyin Trassa · ~42-58 WPM)'
           }
         />
 

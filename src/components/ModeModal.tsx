@@ -187,9 +187,9 @@ export const ModeModal: React.FC<ModeModalProps> = ({
                       <Sparkles className="w-3 h-3" />
                       Oson
                     </span>
-                    <span className="text-[9px] font-mono px-1 rounded bg-emerald-900/60 text-emerald-300">~25-34 WPM</span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-emerald-900/60 text-emerald-300">~10-18 WPM</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 leading-tight">Yutish oson, botlar sekin harakatlanadi</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Yutish oson, botlar juda sekin harakatlanadi</p>
                 </button>
 
                 <button
@@ -206,9 +206,9 @@ export const ModeModal: React.FC<ModeModalProps> = ({
                       <Gauge className="w-3 h-3" />
                       Oʻrta
                     </span>
-                    <span className="text-[9px] font-mono px-1 rounded bg-amber-900/60 text-amber-300">~45-55 WPM</span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-amber-900/60 text-amber-300">~22-34 WPM</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 leading-tight">Ozroq murakkab, chaqqonlik talab qiladi</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Ozroq murakkab, qulay poyga surʼati</p>
                 </button>
 
                 <button
@@ -225,9 +225,9 @@ export const ModeModal: React.FC<ModeModalProps> = ({
                       <Flame className="w-3 h-3" />
                       Qiyin
                     </span>
-                    <span className="text-[9px] font-mono px-1 rounded bg-rose-900/60 text-rose-300">~70-88 WPM</span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-rose-900/60 text-rose-300">~42-58 WPM</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 leading-tight">Faqat tez yozadigan ustalargina yutadi</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Faqat tez yozadigan poygachilar yutadi</p>
                 </button>
               </div>
             </div>

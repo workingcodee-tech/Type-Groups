@@ -210,23 +210,28 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
   // So'zni yakunlash (Kompyuterda Space yoki Mobil qurilmada probel/bo'sh joy bosilganda)
   const commitCurrentWord = useCallback((inputVal: string) => {
     const currentWord = wordsList[currentWordIndex] || '';
-    const trimmed = inputVal.trim();
-    if (!trimmed && !currentInput) return;
+    const cleanInput = (inputVal || currentInput || '').trim();
 
-    const actualWord = trimmed || currentInput;
-    const isMatch = actualWord === currentWord;
+    // Hatto hech narsa yozilmagan bo'lsa ham (masalan, so'zni o'tkazib yuborish uchun bo'sh joy bosilsa), keyingi so'zga o'tkazish
+    const actualWord = cleanInput;
+    const isMatch = actualWord.length > 0 && actualWord === currentWord;
     let wordCorrect = 0;
     let wordErrors = 0;
 
-    for (let i = 0; i < currentWord.length; i++) {
-      if (actualWord[i] === currentWord[i]) {
-        wordCorrect++;
-      } else {
-        wordErrors++;
+    if (actualWord.length > 0) {
+      for (let i = 0; i < currentWord.length; i++) {
+        if (actualWord[i] === currentWord[i]) {
+          wordCorrect++;
+        } else {
+          wordErrors++;
+        }
       }
-    }
-    if (actualWord.length > currentWord.length) {
-      wordErrors += (actualWord.length - currentWord.length);
+      if (actualWord.length > currentWord.length) {
+        wordErrors += (actualWord.length - currentWord.length);
+      }
+    } else {
+      // Hech narsa yozilmasdan bo'sh joy bosilganda so'z harflari xato hisoblanadi
+      wordErrors += currentWord.length;
     }
 
     const nextCorrect = totalCorrectChars + wordCorrect + (isMatch ? 1 : 0);
@@ -234,7 +239,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
     setTotalCorrectChars(nextCorrect);
     setTotalIncorrectChars(nextIncorrect);
-    setTotalKeystrokes((prev) => prev + actualWord.length + 1);
+    setTotalKeystrokes((prev) => prev + Math.max(1, actualWord.length + 1));
 
     setWordHistory((prev) => ({
       ...prev,
@@ -248,6 +253,9 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     const nextWordIdx = currentWordIndex + 1;
     setCurrentWordIndex(nextWordIdx);
     setCurrentInput('');
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
 
     const progressPercent = Math.min(100, Math.max(0, (nextCorrect / targetChars) * 100));
     const currentMeters = Math.min(distance, Math.round((progressPercent / 100) * distance));
@@ -274,27 +282,48 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     }
   }, [currentWordIndex, currentInput, wordsList, totalCorrectChars, totalIncorrectChars, targetChars, distance, startTime, finishSession]);
 
-  // Harf kiritilganda (Mobil telefonlar va kompyuter uchun to'liq optimallashgan)
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Mobil klaviaturalarda Space / Bo'sh joyni ushlash (beforeinput - mobil brauzerlarda eng aniq usul)
+  const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
     if (isFinished || !isGameActive || countdownActive) return;
-    const val = e.target.value;
+    const native = (e as any).nativeEvent as InputEvent;
+    if (!native) return;
 
-    if (!startTime && val.length > 0) {
+    if (!startTime) {
       setStartTime(Date.now());
     }
 
-    // MOBIL QURILMALARDA PROBEL / BO'SH JOY BOSILGANDA:
-    // Virtual klaviatura probel bosganda val oxiriga ' ' qo'shadi yoki val ichida probel bo'ladi
-    if (val.endsWith(' ') || val.includes(' ')) {
-      const cleanVal = val.replace(/\s+/g, '');
-      if (cleanVal.length > 0) {
-        commitCurrentWord(cleanVal);
-      } else if (currentInput.length > 0) {
-        commitCurrentWord(currentInput);
+    // Mobil klaviatura "Bo'sh joy" (Spacebar) yoki Enter yuborganda
+    if (native.data === ' ' || native.data === '\u00A0' || native.inputType === 'insertLineBreak') {
+      e.preventDefault();
+      commitCurrentWord(currentInput);
+      if (inputRef.current) {
+        inputRef.current.value = '';
       }
+      setCurrentInput('');
+    }
+  };
+
+  // Harf kiritilganda (Mobil telefonlar va kompyuter uchun to'liq optimallashgan)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFinished || !isGameActive || countdownActive) return;
+    const rawVal = e.target.value;
+
+    if (!startTime && rawVal.length > 0) {
+      setStartTime(Date.now());
+    }
+
+    // MOBIL QURILMALARDA PROBEL / BO'SH JOY BOSILGANDA (Gboard, Samsung, iOS):
+    if (rawVal.includes(' ') || rawVal.includes('\u00A0') || rawVal.endsWith(' ')) {
+      const cleanVal = rawVal.replace(/[\s\u00A0]+/g, '');
+      commitCurrentWord(cleanVal || currentInput);
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+      setCurrentInput('');
       return;
     }
 
+    const val = rawVal;
     setCurrentInput(val);
 
     const currentWord = wordsList[currentWordIndex] || '';
@@ -339,7 +368,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     }
   };
 
-  // Klaviatura hodisalari (Fizik klaviatura uchun)
+  // Klaviatura hodisalari (Fizik klaviatura va Enter uchun)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isFinished || !isGameActive || countdownActive) return;
 
@@ -369,12 +398,14 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
       return;
     }
 
-    // Probel (Space) bosilganda keyingi so'zga o'tish
-    if (e.key === ' ' || e.code === 'Space') {
+    // Probel (Space) yoki Enter bosilganda keyingi so'zga o'tish
+    if (e.key === ' ' || e.code === 'Space' || e.key === 'Enter') {
       e.preventDefault();
-      if (currentInput.length > 0) {
-        commitCurrentWord(currentInput);
+      commitCurrentWord(currentInput);
+      if (inputRef.current) {
+        inputRef.current.value = '';
       }
+      setCurrentInput('');
       return;
     }
 
@@ -477,7 +508,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
           <AnalogSpeedometer wpm={liveWpm} className="w-13 h-13 sm:w-20 sm:h-20 shrink-0" />
         </div>
 
-        {/* O'ngdagi BIR QATORLIK monoxrom yozish maydoni */}
+        {/* O'ngdagi BIR QATORLIK monoxrom yozish maydoni (Bo'sh joyni bosganda to'g'ridan to'g'ri fokus oladi) */}
         <div
           ref={wordsContainerRef}
           onClick={() => {
@@ -485,12 +516,12 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
               inputRef.current?.focus();
             }
           }}
-          onTouchStart={() => {
+          onTouchEnd={() => {
             if (!countdownActive && !isFinished) {
               inputRef.current?.focus();
             }
           }}
-          className="relative flex-1 w-full h-14 sm:h-16 px-3 sm:px-4 bg-[#141b27]/95 border-2 border-slate-700/80 focus-within:border-emerald-400 rounded-2xl shadow-xl transition-all cursor-text select-none overflow-hidden flex items-center"
+          className="relative flex-1 w-full h-14 sm:h-16 px-3 sm:px-4 bg-[#141b27]/95 border-2 border-slate-700/80 focus-within:border-emerald-400 rounded-2xl shadow-xl transition-all cursor-text overflow-hidden flex items-center"
         >
           {/* Native yashirin input: Mobil Safari/Chrome va kompyuter uchun to'liq optimallashgan */}
           <input
@@ -499,11 +530,12 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
             type="text"
             value={currentInput}
             onChange={handleInputChange}
+            onBeforeInput={handleBeforeInput}
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             disabled={countdownActive || isFinished}
-            className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text bg-transparent border-0 outline-none p-0 m-0"
+            className="absolute inset-0 w-full h-full opacity-[0.01] z-20 cursor-text bg-transparent border-0 outline-none p-0 m-0 text-transparent caret-transparent"
             style={{ fontSize: '16px' }}
             autoFocus={!countdownActive}
             autoCapitalize="none"
@@ -644,6 +676,32 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
             })}
           </div>
         </div>
+      </div>
+
+      {/* Mobilda poyga paytida qulay bo'lishi uchun tezkor "Bo'sh joy" (Spacebar) teginish tugmasi */}
+      <div className="flex sm:hidden items-center justify-between gap-2 px-1 pt-1">
+        <button
+          type="button"
+          onClick={() => {
+            commitCurrentWord(currentInput);
+            if (inputRef.current) inputRef.current.value = '';
+            setCurrentInput('');
+            inputRef.current?.focus();
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            commitCurrentWord(currentInput);
+            if (inputRef.current) inputRef.current.value = '';
+            setCurrentInput('');
+            inputRef.current?.focus();
+          }}
+          disabled={countdownActive || isFinished}
+          className="flex-1 py-2.5 px-3 bg-gradient-to-r from-slate-900 via-cyan-950/60 to-slate-900 border border-cyan-500/40 active:border-cyan-300 rounded-xl text-white font-mono text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 active:scale-98 transition-all cursor-pointer disabled:opacity-40"
+        >
+          <span className="text-cyan-400 text-sm font-black">␣</span>
+          <span>BOʻSH JOY (SPACE)</span>
+          <span className="text-[10px] text-cyan-300/70 font-normal">· Keyingi soʻz</span>
+        </button>
       </div>
     </div>
   );
