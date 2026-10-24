@@ -45,7 +45,8 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
 
   const [copied, setCopied] = React.useState(false);
   const handleShare = () => {
-    const text = `🏁 Type Groups poygasida ${stats.userRank}-oʻrinni egalladim!\n🏎️ Masofa: ${stats.distanceMeters || 100} metr\n⏱️ Bosib oʻtish vaqti: ${stats.timeSeconds.toFixed(1)} soniya\n⌨️ Bosilgan belgilar: ${stats.totalChars} ta (${stats.correctChars} toʻgʻri)\n❌ Xatolar: ${stats.incorrectChars} ta\n⚡ Oʻrtacha tezlik: ${stats.wpm} WPM (${stats.accuracy}% aniqlik)\nType Groups da siz ham sinab koʻring!`;
+    const diffText = stats.difficulty ? (stats.difficulty === 'easy' ? '🟢 Oson' : stats.difficulty === 'medium' ? '🟡 Oʻrta' : '🔴 Qiyin') : '';
+    const text = `🏁 Type Groups poygasida ${stats.userRank}-oʻrinni egalladim! ${diffText ? `(${diffText})` : ''}\n🏎️ Masofa: ${stats.distanceMeters || 100} metr\n⏱️ Bosib oʻtish vaqti: ${stats.timeSeconds.toFixed(1)} soniya\n⌨️ Bosilgan belgilar: ${stats.totalChars} ta (${stats.correctChars} toʻgʻri)\n❌ Xatolar: ${stats.incorrectChars} ta\n⚡ Oʻrtacha tezlik: ${stats.wpm} WPM (${stats.accuracy}% aniqlik)\nType Groups da siz ham sinab koʻring!`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopied(true);
@@ -78,6 +79,19 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
                 <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border ${rankInfo.color}`}>
                   {rankInfo.label}
                 </span>
+                {stats.difficulty && (
+                  <span className={`px-2 py-0.5 rounded-lg text-xs font-mono font-bold border ${
+                    stats.difficulty === 'easy'
+                      ? 'text-emerald-300 border-emerald-500/40 bg-emerald-950/40'
+                      : stats.difficulty === 'medium'
+                      ? 'text-amber-300 border-amber-500/40 bg-amber-950/40'
+                      : 'text-rose-300 border-rose-500/40 bg-rose-950/40'
+                  }`}>
+                    {stats.difficulty === 'easy' && '🟢 Oson'}
+                    {stats.difficulty === 'medium' && '🟡 Oʻrta'}
+                    {stats.difficulty === 'hard' && '🔴 Qiyin'}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 Jami {totalRacers} ta ishtirokchi orasida <strong className="text-cyan-300">{userRank}-oʻrin</strong>

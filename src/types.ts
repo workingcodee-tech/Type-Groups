@@ -43,12 +43,14 @@ export interface LeaderboardEntry {
   isUser?: boolean;
 }
 
+export type DifficultyLevel = 'easy' | 'medium' | 'hard';
+
 export interface Quote {
   id: string;
   text: string;
   source: string;
   category: 'programming' | 'literature' | 'philosophy' | 'tech' | 'speed_drill';
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: DifficultyLevel;
 }
 
 export interface RaceStats {
@@ -62,6 +64,7 @@ export interface RaceStats {
   timeSeconds: number; // qancha vaqtda yozgani (soniyada)
   timeLimitSeconds?: number; // belgilangan vaqt chegarasi (agar tanlangan bo'lsa)
   distanceMeters?: number; // tanlangan poyga masofasi (100m, 500m, 1000m)
+  difficulty?: DifficultyLevel; // poyga qiyinlik darajasi (oson, o'rta, qiyin)
   wpmHistory: number[];
   consistency: number; // bir maromdalik
   keystrokes: number; // jami klaviatura bosilishlari

@@ -6,6 +6,7 @@ import { SoloRaceArena } from './components/SoloRaceArena';
 import { MultiplayerRoom } from './components/MultiplayerRoom';
 import { generate5000Words } from './data/words';
 import { SwitchSoundType, sounds } from './utils/soundEffects';
+import { DifficultyLevel } from './types';
 import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -15,6 +16,7 @@ export default function App() {
 
   // Ilova holati: 'home' | 'solo' | 'room'
   const [viewState, setViewState] = useState<'home' | 'solo' | 'room'>('home');
+  const [soloDifficulty, setSoloDifficulty] = useState<DifficultyLevel>('medium');
 
   // Foydalanuvchi ma'lumotlari
   const [currentUser, setCurrentUser] = useState<{
@@ -49,12 +51,13 @@ export default function App() {
   };
 
   // 1-Bo'lim: Bir o'zim yozaman (Solo)
-  const handleStartSolo = (userName: string, carId: string) => {
+  const handleStartSolo = (userName: string, carId: string, difficulty: DifficultyLevel = 'medium') => {
     setCurrentUser((prev) => ({
       ...prev,
       name: userName,
       carId
     }));
+    setSoloDifficulty(difficulty);
     setViewState('solo');
   };
 
@@ -265,6 +268,7 @@ export default function App() {
           <SoloRaceArena
             userName={currentUser.name}
             carId={currentUser.carId}
+            initialDifficulty={soloDifficulty}
             onBack={() => setViewState('home')}
           />
         )}

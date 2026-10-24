@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Trophy, Users, PlusCircle, ArrowRight, Zap, Flag } from 'lucide-react';
 import { ModeModal, ModeType } from './ModeModal';
+import { DifficultyLevel } from '../types';
 
 interface HomeModeSelectorProps {
-  onStartSolo: (userName: string, carId: string) => void;
+  onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel) => void;
   onJoinGroup: (roomId: string, userName: string, carId: string) => void;
   onCreateGroup: (groupName: string, userName: string, carId: string) => void;
 }
@@ -105,9 +106,9 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
       <ModeModal
         mode={activeModal}
         onClose={() => setActiveModal(null)}
-        onStartSolo={(name, car) => {
+        onStartSolo={(name, car, diff) => {
           setActiveModal(null);
-          onStartSolo(name, car);
+          onStartSolo(name, car, diff);
         }}
         onJoinGroup={(id, name, car) => {
           setActiveModal(null);

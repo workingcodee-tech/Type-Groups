@@ -4,12 +4,14 @@ interface AnalogSpeedometerProps {
   wpm: number;
   maxWpm?: number;
   size?: number;
+  className?: string;
 }
 
 export const AnalogSpeedometer: React.FC<AnalogSpeedometerProps> = ({
   wpm,
   maxWpm = 160,
-  size = 100
+  size,
+  className
 }) => {
   // Clamp speed
   const clampedWpm = Math.min(maxWpm, Math.max(0, wpm));
@@ -24,8 +26,8 @@ export const AnalogSpeedometer: React.FC<AnalogSpeedometerProps> = ({
 
   return (
     <div
-      className="relative flex items-center justify-center shrink-0 select-none"
-      style={{ width: size, height: size }}
+      className={`relative flex items-center justify-center shrink-0 select-none ${className || ''}`}
+      style={size ? { width: size, height: size } : undefined}
     >
       <svg
         viewBox="0 0 100 100"

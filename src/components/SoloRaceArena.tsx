@@ -3,7 +3,7 @@ import { HighwayRaceTrack, HighwayRacer } from './HighwayRaceTrack';
 import { WordsTypingArena, DISTANCE_TARGETS } from './WordsTypingArena';
 import { RaceResultsModal } from './RaceResultsModal';
 import { generate5000Words } from '../data/words';
-import { RaceStats } from '../types';
+import { RaceStats, DifficultyLevel } from '../types';
 import { LogOut } from 'lucide-react';
 import { FAMOUS_CARS } from '../data/cars';
 import { sounds } from '../utils/soundEffects';
@@ -11,17 +11,39 @@ import { sounds } from '../utils/soundEffects';
 interface SoloRaceArenaProps {
   userName: string;
   carId: string;
+  initialDifficulty?: DifficultyLevel;
   onBack: () => void;
 }
+
+// 3 xil qiyinlik darajasidagi botlar parametrlari
+const BOT_CONFIGS: Record<DifficultyLevel, { id: string; name: string; carId: string; wpm: number; accuracy: number }[]> = {
+  easy: [
+    { id: 'bot-1', name: 'Sokin Haydovchi', carId: 'malibu', wpm: 24, accuracy: 96 },
+    { id: 'bot-2', name: 'Shahar Mashinasi', carId: 'kia', wpm: 30, accuracy: 97 },
+    { id: 'bot-3', name: 'Asta Poygachi', carId: 'audi', wpm: 36, accuracy: 98 },
+  ],
+  medium: [
+    { id: 'bot-1', name: 'Kruiz Poygachi', carId: 'bmw', wpm: 45, accuracy: 97 },
+    { id: 'bot-2', name: 'Nitro Mustang', carId: 'mustang', wpm: 52, accuracy: 98 },
+    { id: 'bot-3', name: 'Turbo AMG', carId: 'mers', wpm: 60, accuracy: 98 },
+  ],
+  hard: [
+    { id: 'bot-1', name: 'Shadow Ferrari', carId: 'ferrari', wpm: 70, accuracy: 98 },
+    { id: 'bot-2', name: 'Hyper 911', carId: 'porsche', wpm: 80, accuracy: 99 },
+    { id: 'bot-3', name: 'Bugatti Phantom', carId: 'bugatti', wpm: 90, accuracy: 99 },
+  ],
+};
 
 export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
   userName,
   carId,
+  initialDifficulty = 'medium',
   onBack
 }) => {
   const [wordsList, setWordsList] = useState<string[]>(() => generate5000Words());
   const [raceStats, setRaceStats] = useState<RaceStats | null>(null);
   const [selectedDistance, setSelectedDistance] = useState<number>(100);
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>(initialDifficulty);
 
   // 3-2-1 Countdown holati
   const [countdown, setCountdown] = useState<number | null>(3);
@@ -30,53 +52,35 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
 
   const selectedCar = FAMOUS_CARS.find(c => c.id === carId) || FAMOUS_CARS[0];
 
-  // 4 ta poygachi (Foydalanuvchi + 3 ta arcade bot raqib)
-  const initialRacers = useMemo<HighwayRacer[]>(() => [
-    {
-      id: 'user-player',
-      name: userName || 'Siz (Oʻyinchi)',
-      carId: selectedCar.id,
+  // 4 ta poygachi (Foydalanuvchi + tanlangan darajadagi 3 ta bot raqib)
+  const initialRacers = useMemo<HighwayRacer[]>(() => {
+    const currentBots = BOT_CONFIGS[difficulty].map((bot, index) => ({
+      id: bot.id,
+      name: bot.name,
+      carId: bot.carId,
       progress: 0,
-      currentWpm: 0,
-      accuracy: 100,
-      finished: false,
-      isUser: true,
-      rank: 1
-    },
-    {
-      id: 'bot-1',
-      name: 'Turbo Apex',
-      carId: 'ferrari',
-      progress: 0,
-      currentWpm: 55,
-      accuracy: 98,
+      currentWpm: bot.wpm,
+      accuracy: bot.accuracy,
       finished: false,
       isUser: false,
-      rank: 2
-    },
-    {
-      id: 'bot-2',
-      name: 'Shadow Drift',
-      carId: 'mustang',
-      progress: 0,
-      currentWpm: 66,
-      accuracy: 97,
-      finished: false,
-      isUser: false,
-      rank: 3
-    },
-    {
-      id: 'bot-3',
-      name: 'Neon Velocity',
-      carId: 'porsche',
-      progress: 0,
-      currentWpm: 76,
-      accuracy: 99,
-      finished: false,
-      isUser: false,
-      rank: 4
-    }
-  ], [userName, selectedCar.id]);
+      rank: index + 2
+    }));
+
+    return [
+      {
+        id: 'user-player',
+        name: userName || 'Siz (Oʻyinchi)',
+        carId: selectedCar.id,
+        progress: 0,
+        currentWpm: 0,
+        accuracy: 100,
+        finished: false,
+        isUser: true,
+        rank: 1
+      },
+      ...currentBots
+    ];
+  }, [userName, selectedCar.id, difficulty]);
 
   const [racers, setRacers] = useState<HighwayRacer[]>(initialRacers);
   const botIntervalRef = useRef<number | null>(null);
@@ -119,7 +123,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
     }, 1000);
   }, [initialRacers]);
 
-  // Sahifa yuklanganda 3-2-1 bilan boshlanadi (faqat bir marta)
+  // Sahifa yuklanganda yoki difficulty/distance o'zgarganda 3-2-1 bilan boshlanadi
   useEffect(() => {
     startCountdown();
     return () => {
@@ -132,7 +136,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
     };
   }, [startCountdown]);
 
-  // Botlarning masofaga qarab harakatlanishi
+  // Botlarning masofaga va qiyinlik darajasiga qarab harakatlanishi
   useEffect(() => {
     if (!isRaceActive || raceStats) {
       if (botIntervalRef.current) {
@@ -143,22 +147,20 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
     }
 
     const targetWords = (DISTANCE_TARGETS[selectedDistance] || 100) / 5;
+    const botSpeeds: Record<string, number> = {};
+    BOT_CONFIGS[difficulty].forEach(b => {
+      botSpeeds[b.id] = b.wpm;
+    });
 
     botIntervalRef.current = window.setInterval(() => {
       if (!raceStartTimeRef.current) return;
       const elapsedSeconds = (Date.now() - raceStartTimeRef.current) / 1000;
 
       setRacers((prev) => {
-        const botSpeeds: Record<string, number> = {
-          'bot-1': 55, // 55 WPM
-          'bot-2': 66, // 66 WPM
-          'bot-3': 76  // 76 WPM
-        };
-
         const updated = prev.map((racer) => {
           if (racer.isUser || racer.finished) return racer;
 
-          const wpm = botSpeeds[racer.id] || 60;
+          const wpm = botSpeeds[racer.id] || 45;
           // Soniya boshiga so'z: wpm / 60
           const wordsTyped = elapsedSeconds * (wpm / 60);
           const progress = Math.min(100, Math.round((wordsTyped / targetWords) * 100));
@@ -194,7 +196,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
         clearInterval(botIntervalRef.current);
       }
     };
-  }, [isRaceActive, raceStats, selectedDistance]);
+  }, [isRaceActive, raceStats, selectedDistance, difficulty]);
 
   // Foydalanuvchi klaviaturada yozganda progress yangilanishi
   const handleProgressUpdate = useCallback((
@@ -239,13 +241,14 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
       setRaceStats({
         ...stats,
         distanceMeters: selectedDistance,
+        difficulty,
         userRank,
         totalRacers: current.length
       });
       return current;
     });
     setIsRaceActive(false);
-  }, [selectedDistance]);
+  }, [selectedDistance, difficulty]);
 
   const handleRestartRace = useCallback(() => {
     setRaceStats(null);
@@ -259,17 +262,63 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
     startCountdown();
   }, [startCountdown]);
 
+  const handleDifficultyChange = useCallback((newDiff: DifficultyLevel) => {
+    setDifficulty(newDiff);
+    setRaceStats(null);
+    setWordsList(generate5000Words());
+  }, []);
+
   return (
     <div className="w-full h-full max-w-5xl mx-auto flex flex-col justify-between py-1 px-2 select-none relative">
-      {/* 1. Kichik chiqish tugmasi va o'yinchi ma'lumoti */}
-      <div className="flex items-center justify-between px-1 py-0.5">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-lg transition-colors cursor-pointer"
-        >
-          <LogOut className="w-3 h-3 text-rose-400" />
-          <span>Chiqish</span>
-        </button>
+      {/* 1. Kichik chiqish tugmasi, qiyinlik darajasi va poyga sozlamalari */}
+      <div className="flex items-center justify-between px-1 py-0.5 flex-wrap gap-1">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-lg transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3 h-3 text-rose-400" />
+            <span>Chiqish</span>
+          </button>
+
+          {/* Qiyinlik darajasini almashtirish: Oson / O'rta / Qiyin */}
+          <div className="flex items-center p-0.5 bg-slate-950/90 border border-slate-800 rounded-lg text-[10px] font-bold">
+            <span className="px-1.5 text-slate-400 font-semibold hidden sm:inline">Daraja:</span>
+            <button
+              type="button"
+              onClick={() => handleDifficultyChange('easy')}
+              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                difficulty === 'easy'
+                  ? 'bg-emerald-500 text-slate-950 font-black shadow-sm shadow-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🟢 Oson
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDifficultyChange('medium')}
+              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                difficulty === 'medium'
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm shadow-amber-400/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🟡 Oʻrta
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDifficultyChange('hard')}
+              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                difficulty === 'hard'
+                  ? 'bg-rose-500 text-white font-black shadow-sm shadow-rose-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🔴 Qiyin
+            </button>
+          </div>
+        </div>
 
         <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
           <span>🏎️ <strong className="text-white">{selectedCar.name}</strong></span>
@@ -286,7 +335,13 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
       <div className="my-auto py-1 relative">
         <HighwayRaceTrack
           racers={racers}
-          roomName="Arcade Race Track"
+          roomName={
+            difficulty === 'easy'
+              ? 'Yakka Poyga (Oson Trassa · ~30 WPM)'
+              : difficulty === 'medium'
+              ? 'Yakka Poyga (Oʻrta Trassa · ~50 WPM)'
+              : 'Yakka Poyga (Qiyin Trassa · ~80 WPM)'
+          }
         />
 
         {/* 3... 2... 1... START! Overlay */}

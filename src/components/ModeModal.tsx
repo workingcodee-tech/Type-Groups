@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { User, Users, PlusCircle, X, ArrowRight, AlertCircle } from 'lucide-react';
+import { User, Users, PlusCircle, X, ArrowRight, AlertCircle, Sparkles, Gauge, Flame } from 'lucide-react';
 import { CarSelector } from './CarSelector';
+import { DifficultyLevel } from '../types';
 
 export type ModeType = 'solo' | 'join' | 'create';
 
 interface ModeModalProps {
   mode: ModeType | null;
   onClose: () => void;
-  onStartSolo: (userName: string, carId: string) => void;
+  onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel) => void;
   onJoinGroup: (roomId: string, userName: string, carId: string) => void;
   onCreateGroup: (groupName: string, userName: string, carId: string) => void;
 }
@@ -29,6 +30,7 @@ export const ModeModal: React.FC<ModeModalProps> = ({
     }
   });
   const [selectedCarId, setSelectedCarId] = useState<string>('bmw');
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
   const [groupName, setGroupName] = useState<string>('');
   const [roomIdInput, setRoomIdInput] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -50,7 +52,7 @@ export const ModeModal: React.FC<ModeModalProps> = ({
     }
 
     if (mode === 'solo') {
-      onStartSolo(userName.trim(), selectedCarId);
+      onStartSolo(userName.trim(), selectedCarId, difficulty);
     } else if (mode === 'join') {
       const cleanId = roomIdInput.trim();
       if (!cleanId || cleanId.length !== 6) {
@@ -156,6 +158,80 @@ export const ModeModal: React.FC<ModeModalProps> = ({
               className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-cyan-400"
             />
           </div>
+
+          {/* Qiyinlik darajasini tanlash (Faqat Yakka Poyga uchun) */}
+          {mode === 'solo' && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-300">
+                  Qiyinlik Darajasi:
+                </label>
+                <span className="text-[10px] font-mono">
+                  {difficulty === 'easy' && <span className="text-emerald-400 font-bold">🟢 Oson (Yutish oson)</span>}
+                  {difficulty === 'medium' && <span className="text-amber-400 font-bold">🟡 Oʻrta (Balansli poyga)</span>}
+                  {difficulty === 'hard' && <span className="text-rose-400 font-bold">🔴 Qiyin (Faqat tezkorlar)</span>}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDifficulty('easy')}
+                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    difficulty === 'easy'
+                      ? 'bg-emerald-950/80 border-emerald-400 text-white ring-1 ring-emerald-400/50 shadow-md shadow-emerald-950/40'
+                      : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-black text-emerald-400 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Oson
+                    </span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-emerald-900/60 text-emerald-300">~25-34 WPM</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">Yutish oson, botlar sekin harakatlanadi</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDifficulty('medium')}
+                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    difficulty === 'medium'
+                      ? 'bg-amber-950/80 border-amber-400 text-white ring-1 ring-amber-400/50 shadow-md shadow-amber-950/40'
+                      : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-black text-amber-400 flex items-center gap-1">
+                      <Gauge className="w-3 h-3" />
+                      Oʻrta
+                    </span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-amber-900/60 text-amber-300">~45-55 WPM</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">Ozroq murakkab, chaqqonlik talab qiladi</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDifficulty('hard')}
+                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    difficulty === 'hard'
+                      ? 'bg-rose-950/80 border-rose-500 text-white ring-1 ring-rose-500/50 shadow-md shadow-rose-950/40'
+                      : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-black text-rose-400 flex items-center gap-1">
+                      <Flame className="w-3 h-3" />
+                      Qiyin
+                    </span>
+                    <span className="text-[9px] font-mono px-1 rounded bg-rose-900/60 text-rose-300">~70-88 WPM</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">Faqat tez yozadigan ustalargina yutadi</p>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Mashina tanlash */}
           <CarSelector

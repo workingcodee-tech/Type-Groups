@@ -108,6 +108,13 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     handleReset();
   }, [wordsList, handleReset]);
 
+  // 3-2-1 countdown tugaganda avtomatik fokus qilish
+  useEffect(() => {
+    if (!countdownActive && isGameActive && !isFinished) {
+      inputRef.current?.focus();
+    }
+  }, [countdownActive, isGameActive, isFinished]);
+
   // Foydalanuvchi qo'lda tugma bosganda qayta boshlash
   const handleManualRestart = useCallback(() => {
     handleReset();
@@ -188,26 +195,104 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     };
   }, [startTime, isFinished, isGameActive, countdownActive, totalCorrectChars]);
 
-  // Single-line Gorizontal silliq siljish (Aktiv so'zni ~120px chapdan ushlab turadi)
+  // Single-line Gorizontal silliq siljish (Aktiv so'zni ekran kengligiga mos chapdan ushlab turadi)
   useEffect(() => {
     const activeEl = wordRefs.current[currentWordIndex];
     if (activeEl) {
       const activeLeft = activeEl.offsetLeft;
-      // 130px masofa chapdan qoldiriladi, qolgan so'zlar o'ngdan kirib keladi
-      const newScrollX = Math.max(0, activeLeft - 130);
+      const containerWidth = wordsContainerRef.current?.clientWidth || 360;
+      const offset = containerWidth > 500 ? 120 : 40;
+      const newScrollX = Math.max(0, activeLeft - offset);
       setScrollX(newScrollX);
     }
   }, [currentWordIndex]);
 
-  // Harf kiritilganda
+  // So'zni yakunlash (Kompyuterda Space yoki Mobil qurilmada probel/bo'sh joy bosilganda)
+  const commitCurrentWord = useCallback((inputVal: string) => {
+    const currentWord = wordsList[currentWordIndex] || '';
+    const trimmed = inputVal.trim();
+    if (!trimmed && !currentInput) return;
+
+    const actualWord = trimmed || currentInput;
+    const isMatch = actualWord === currentWord;
+    let wordCorrect = 0;
+    let wordErrors = 0;
+
+    for (let i = 0; i < currentWord.length; i++) {
+      if (actualWord[i] === currentWord[i]) {
+        wordCorrect++;
+      } else {
+        wordErrors++;
+      }
+    }
+    if (actualWord.length > currentWord.length) {
+      wordErrors += (actualWord.length - currentWord.length);
+    }
+
+    const nextCorrect = totalCorrectChars + wordCorrect + (isMatch ? 1 : 0);
+    const nextIncorrect = totalIncorrectChars + wordErrors;
+
+    setTotalCorrectChars(nextCorrect);
+    setTotalIncorrectChars(nextIncorrect);
+    setTotalKeystrokes((prev) => prev + actualWord.length + 1);
+
+    setWordHistory((prev) => ({
+      ...prev,
+      [currentWordIndex]: {
+        input: actualWord,
+        isCorrect: isMatch
+      }
+    }));
+
+    sounds.playKey(' ', true, !isMatch);
+    const nextWordIdx = currentWordIndex + 1;
+    setCurrentWordIndex(nextWordIdx);
+    setCurrentInput('');
+
+    const progressPercent = Math.min(100, Math.max(0, (nextCorrect / targetChars) * 100));
+    const currentMeters = Math.min(distance, Math.round((progressPercent / 100) * distance));
+
+    const now = Date.now();
+    const seconds = startTime ? Math.max(0.1, (now - startTime) / 1000) : 0.1;
+    const minutes = seconds / 60;
+    const liveWpm = Math.max(0, Math.round((nextCorrect / 5) / minutes));
+    const totalChars = nextCorrect + nextIncorrect;
+    const liveAccuracy = totalChars > 0 ? Math.round((nextCorrect / totalChars) * 100) : 100;
+
+    onProgressUpdateRef.current(
+      progressPercent,
+      liveWpm,
+      liveAccuracy,
+      totalChars,
+      nextIncorrect,
+      currentMeters
+    );
+
+    // Agar belgilangan masofa to'liq bosib o'tilsa
+    if (nextCorrect >= targetChars) {
+      finishSession(seconds, nextCorrect);
+    }
+  }, [currentWordIndex, currentInput, wordsList, totalCorrectChars, totalIncorrectChars, targetChars, distance, startTime, finishSession]);
+
+  // Harf kiritilganda (Mobil telefonlar va kompyuter uchun to'liq optimallashgan)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isFinished || !isGameActive || countdownActive) return;
     const val = e.target.value;
 
-    if (val.endsWith(' ')) return;
-
     if (!startTime && val.length > 0) {
       setStartTime(Date.now());
+    }
+
+    // MOBIL QURILMALARDA PROBEL / BO'SH JOY BOSILGANDA:
+    // Virtual klaviatura probel bosganda val oxiriga ' ' qo'shadi yoki val ichida probel bo'ladi
+    if (val.endsWith(' ') || val.includes(' ')) {
+      const cleanVal = val.replace(/\s+/g, '');
+      if (cleanVal.length > 0) {
+        commitCurrentWord(cleanVal);
+      } else if (currentInput.length > 0) {
+        commitCurrentWord(currentInput);
+      }
+      return;
     }
 
     setCurrentInput(val);
@@ -240,13 +325,21 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
       currentMeters
     );
 
+    // Tovush effektlari
+    if (val.length > currentInput.length) {
+      setTotalKeystrokes((prev) => prev + (val.length - currentInput.length));
+      const lastChar = val[val.length - 1];
+      const targetChar = currentWord[val.length - 1];
+      sounds.playKey(lastChar, false, lastChar !== targetChar);
+    }
+
     // Agar belgilangan masofa to'liq bosib o'tilsa (progress 100%)
     if (effectiveCorrect >= targetChars) {
       finishSession(seconds, effectiveCorrect);
     }
   };
 
-  // Klaviatura hodisalari
+  // Klaviatura hodisalari (Fizik klaviatura uchun)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isFinished || !isGameActive || countdownActive) return;
 
@@ -276,75 +369,16 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
       return;
     }
 
-    // Probel bosilganda keyingi so'zga o'tish
+    // Probel (Space) bosilganda keyingi so'zga o'tish
     if (e.key === ' ' || e.code === 'Space') {
       e.preventDefault();
-      const currentWord = wordsList[currentWordIndex] || '';
-      if (!currentInput) return;
-
-      const isMatch = currentInput === currentWord;
-      let wordCorrect = 0;
-      let wordErrors = 0;
-
-      for (let i = 0; i < currentWord.length; i++) {
-        if (currentInput[i] === currentWord[i]) {
-          wordCorrect++;
-        } else {
-          wordErrors++;
-        }
-      }
-      if (currentInput.length > currentWord.length) {
-        wordErrors += (currentInput.length - currentWord.length);
-      }
-
-      const nextCorrect = totalCorrectChars + wordCorrect + (isMatch ? 1 : 0);
-      const nextIncorrect = totalIncorrectChars + wordErrors;
-
-      setTotalCorrectChars(nextCorrect);
-      setTotalIncorrectChars(nextIncorrect);
-      setTotalKeystrokes((prev) => prev + currentInput.length + 1);
-
-      setWordHistory((prev) => ({
-        ...prev,
-        [currentWordIndex]: {
-          input: currentInput,
-          isCorrect: isMatch
-        }
-      }));
-
-      sounds.playKey(' ', true, !isMatch);
-      const nextWordIdx = currentWordIndex + 1;
-      setCurrentWordIndex(nextWordIdx);
-      setCurrentInput('');
-
-      const progressPercent = Math.min(100, Math.max(0, (nextCorrect / targetChars) * 100));
-      const currentMeters = Math.min(distance, Math.round((progressPercent / 100) * distance));
-
-      const now = Date.now();
-      const seconds = startTime ? Math.max(0.1, (now - startTime) / 1000) : 0.1;
-      const minutes = seconds / 60;
-      const liveWpm = Math.max(0, Math.round((nextCorrect / 5) / minutes));
-      const totalChars = nextCorrect + nextIncorrect;
-      const liveAccuracy = totalChars > 0 ? Math.round((nextCorrect / totalChars) * 100) : 100;
-
-      onProgressUpdateRef.current(
-        progressPercent,
-        liveWpm,
-        liveAccuracy,
-        totalChars,
-        nextIncorrect,
-        currentMeters
-      );
-
-      // Agar marraga yetib kelsa
-      if (nextCorrect >= targetChars) {
-        finishSession(seconds, nextCorrect);
+      if (currentInput.length > 0) {
+        commitCurrentWord(currentInput);
       }
       return;
     }
 
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      setTotalKeystrokes((prev) => prev + 1);
       const targetChar = (wordsList[currentWordIndex] || '')[currentInput.length];
       const isError = e.key !== targetChar;
       sounds.playKey(e.key, false, isError);
@@ -436,24 +470,31 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
         </div>
       </div>
 
-      {/* 2. PASTKI QISM: SPIDOMETR VA BIR QATORLIK YOZISH KONSOLI */}
-      <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full">
-        {/* Chapdagi Analog Spidometr */}
+      {/* 2. PASTKI QISM: SPIDOMETR VA BIR QATORLIK YOZISH KONSOLI (Mobil va Desktop) */}
+      <div className="flex flex-row items-center gap-2 sm:gap-3 w-full">
+        {/* Chapdagi Analog Spidometr (Mobilda 52px, kompyuterda 80px) */}
         <div className="shrink-0 flex items-center justify-center">
-          <AnalogSpeedometer wpm={liveWpm} size={84} />
+          <AnalogSpeedometer wpm={liveWpm} className="w-13 h-13 sm:w-20 sm:h-20 shrink-0" />
         </div>
 
-        {/* O'ngdagi BIR QATORLIK monoxrom yozish maydoni (Foydalanuvchi talabi: faqat 1 qator bo'lsin) */}
+        {/* O'ngdagi BIR QATORLIK monoxrom yozish maydoni */}
         <div
           ref={wordsContainerRef}
           onClick={() => {
-            if (!countdownActive) {
+            if (!countdownActive && !isFinished) {
               inputRef.current?.focus();
             }
           }}
-          className="relative flex-1 w-full h-14 sm:h-16 px-4 bg-[#141b27]/95 border-2 border-slate-700/80 focus-within:border-emerald-400 rounded-2xl shadow-xl transition-all cursor-text select-none overflow-hidden flex items-center"
+          onTouchStart={() => {
+            if (!countdownActive && !isFinished) {
+              inputRef.current?.focus();
+            }
+          }}
+          className="relative flex-1 w-full h-14 sm:h-16 px-3 sm:px-4 bg-[#141b27]/95 border-2 border-slate-700/80 focus-within:border-emerald-400 rounded-2xl shadow-xl transition-all cursor-text select-none overflow-hidden flex items-center"
         >
+          {/* Native yashirin input: Mobil Safari/Chrome va kompyuter uchun to'liq optimallashgan */}
           <input
+            id="race-active-input"
             ref={inputRef}
             type="text"
             value={currentInput}
@@ -462,30 +503,31 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             disabled={countdownActive || isFinished}
-            className="absolute inset-0 opacity-0 cursor-default"
+            className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-text bg-transparent border-0 outline-none p-0 m-0"
+            style={{ fontSize: '16px' }}
             autoFocus={!countdownActive}
-            autoCapitalize="off"
+            autoCapitalize="none"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
+            inputMode="text"
             aria-label="So'zlarni kiritish maydoni"
           />
 
-          {/* Fokus yo'qolganda ko'rsatma */}
+          {/* Fokus yo'qolganda ko'rsatma (pointer-events-none bo'lgani tufayli har qanday teginish to'g'ridan to'g'ri inputga o'tadi) */}
           {!isFocused && !isFinished && !countdownActive && (
             <div
-              onClick={() => inputRef.current?.focus()}
-              className="absolute inset-0 bg-[#0c121d]/85 backdrop-blur-[2px] flex items-center justify-center cursor-pointer z-30"
+              className="absolute inset-0 bg-[#0c121d]/85 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none"
             >
-              <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-950/90 border border-emerald-500/60 px-3 py-1 rounded-lg animate-pulse">
-                🎮 Yozish uchun bosing
+              <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-950/90 border border-emerald-500/60 px-3 py-1 rounded-lg animate-pulse shadow-lg flex items-center gap-1.5">
+                <span>⌨️</span> Yozish uchun bosing
               </span>
             </div>
           )}
 
           {/* Countdown vaqtida ko'rsatma */}
           {countdownActive && (
-            <div className="absolute inset-0 bg-[#0c121d]/90 backdrop-blur-xs flex items-center justify-center z-30 pointer-events-none">
+            <div className="absolute inset-0 bg-[#0c121d]/90 backdrop-blur-xs flex items-center justify-center z-10 pointer-events-none">
               <span className="text-xs font-mono font-bold text-amber-400 animate-pulse tracking-wide">
                 🚦 POYGA BOSHLANISHI KUTILMOQDA... (3-2-1)
               </span>
