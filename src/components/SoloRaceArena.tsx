@@ -310,16 +310,16 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
             </span>
           </div>
 
-          {/* Bosh sahifa / Rejimlar tanlovi */}
+          {/* Poygani to'xtatish va asosiy sahifaga qaytish (Har doim bosh sahifaga olib o'tadi) */}
           {onBack && (
             <button
               type="button"
               onClick={onBack}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
-              title="Bosh menyuga qaytish va rejim tanlash"
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-rose-200 hover:text-white bg-rose-950/80 hover:bg-rose-900 border border-rose-700/80 rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
+              title="Poygani toʻxtatish va asosiy menyuga qaytish"
             >
-              <span>🏠</span>
-              <span>Rejimlar</span>
+              <span>🛑</span>
+              <span>Toʻxtatish</span>
             </button>
           )}
 
@@ -474,16 +474,24 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
 
       {/* 3. Spidometr va Bir Qatorlik Yozish Maydoni */}
       <div className="pt-1">
-        <WordsTypingArena
-          wordsList={wordsList}
-          onProgressUpdate={handleProgressUpdate}
-          onFinish={handleFinish}
-          isGameActive={isRaceActive}
-          countdownActive={countdown !== null}
-          selectedDistance={selectedDistance}
-          onDistanceChange={handleDistanceChange}
-          onRestart={handleRestartRace}
-        />
+        {(() => {
+          const userRacer = racers.find(r => r.isUser);
+          const userLiveRank = userRacer?.rank || 1;
+          return (
+            <WordsTypingArena
+              wordsList={wordsList}
+              onProgressUpdate={handleProgressUpdate}
+              onFinish={handleFinish}
+              isGameActive={isRaceActive}
+              countdownActive={countdown !== null}
+              selectedDistance={selectedDistance}
+              onDistanceChange={handleDistanceChange}
+              onRestart={handleRestartRace}
+              userRank={userLiveRank}
+              totalRacers={racers.length}
+            />
+          );
+        })()}
       </div>
 
       {/* 1. Poyga yakunida Chiroyli G'alaba Animatsiyasi (FinishCelebrationOverlay) */}

@@ -14,6 +14,8 @@ interface WordsTypingArenaProps {
   onDistanceChange?: (meters: number) => void;
   onRestart?: () => void;
   startTimeMs?: number | null; // Sinxron poyga start vaqti (millisoniyalarda)
+  userRank?: number; // Foydalanuvchining joriy jonli o'rni (1-o'rin, 2-o'rin...)
+  totalRacers?: number; // Jami poygachilar soni
 }
 
 interface WordHistoryItem {
@@ -44,7 +46,9 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
   selectedDistance: externalDistance,
   onDistanceChange,
   onRestart,
-  startTimeMs = null
+  startTimeMs = null,
+  userRank,
+  totalRacers = 4
 }) => {
   const [distance, setDistance] = useState<number>(externalDistance || 100);
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
@@ -468,16 +472,44 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
   return (
     <div className="w-full flex flex-col gap-1.5 shrink-0">
-      {/* 1. TOP ARCADE HUD: WPM, MASOFA TANLASH (100m, 500m, 1000m), VA SEKUNDOMER */}
-      <div className="flex items-center justify-between px-1">
-        {/* Chapdagi WPM nishoni */}
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-[#111827]/90 border border-slate-700/80 rounded-xl shadow-lg backdrop-blur-xs">
-          <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
-            {liveWpm}
-          </span>
-          <span className="text-[10px] sm:text-xs font-bold text-slate-400 font-mono tracking-wider">
-            WPM
-          </span>
+      {/* 1. TOP ARCADE HUD: WPM, O'RNINGIZ, MASOFA VA SEKUNDOMER */}
+      <div className="flex items-center justify-between px-1 gap-1.5 flex-wrap sm:flex-nowrap">
+        {/* Chapdagi WPM va O'RNINGIZ nishonlari */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Jonli WPM */}
+          <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-[#111827]/90 border border-slate-700/80 rounded-xl shadow-lg backdrop-blur-xs">
+            <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
+              {liveWpm}
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400 font-mono tracking-wider">
+              WPM
+            </span>
+          </div>
+
+          {/* Jonli O'RNINGIZ nishoni (Faqat foydalanuvchining o'ziga katta va aniq ko'rinadi) */}
+          {userRank !== undefined && (
+            <div className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-xl border-2 shadow-lg transition-all animate-pulse ${
+              userRank === 1
+                ? 'bg-gradient-to-r from-amber-950/90 to-yellow-950/80 border-amber-400 text-amber-300 shadow-amber-500/20'
+                : userRank === 2
+                ? 'bg-gradient-to-r from-slate-900/90 to-slate-800/80 border-slate-400 text-slate-200 shadow-slate-500/20'
+                : userRank === 3
+                ? 'bg-gradient-to-r from-orange-950/90 to-amber-950/80 border-amber-600 text-amber-400 shadow-orange-500/20'
+                : 'bg-slate-900/90 border-slate-700 text-slate-300'
+            }`}>
+              <span className="text-sm sm:text-base">
+                {userRank === 1 ? '🥇' : userRank === 2 ? '🥈' : userRank === 3 ? '🥉' : '🏎️'}
+              </span>
+              <div className="flex flex-col text-left leading-none">
+                <span className="text-[8px] sm:text-[9px] uppercase tracking-wider font-mono font-black text-amber-400">
+                  OʻRNINGIZ
+                </span>
+                <span className="text-xs sm:text-sm font-black font-mono text-white">
+                  {userRank}-oʻrin <span className="text-[10px] text-slate-400 font-normal">/{totalRacers || 4}</span>
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* O'rtada Masofa tanlash tugmalari: 50m, 100m, 200m, 500m, 1000m */}

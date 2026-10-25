@@ -362,18 +362,29 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     }
   };
 
+  // Guruhni tugatish (Guruh yaratuvchisi bosganda xonani yopadi va darhol bosh sahifaga qaytadi)
   const handleDeleteRoom = async () => {
-    if (!window.confirm('Haqiqatan ham guruhni yakunlab, xonani butunlay oʻchirmoqchimisiz?')) return;
     try {
       const participantsRef = collection(db, 'rooms', roomId, 'participants');
       const snap = await getDocs(participantsRef);
       const deletePromises = snap.docs.map((docSnap) => deleteDoc(docSnap.ref));
       await Promise.all(deletePromises);
-
       await deleteDoc(doc(db, 'rooms', roomId));
-      onLeave();
     } catch (e) {
       console.warn("Guruhni o'chirishda xatolik:", e);
+    } finally {
+      onLeave();
+    }
+  };
+
+  // Guruhdan chiqish (Ishtirokchi bosganda ishtirokchilar ro'yxatidan o'chadi va darhol bosh sahifaga qaytadi)
+  const handleParticipantLeave = async () => {
+    try {
+      const myRef = doc(db, 'rooms', roomId, 'participants', myId);
+      await deleteDoc(myRef);
+    } catch (e) {
+      console.warn("Guruhdan chiqishda xatolik:", e);
+    } finally {
       onLeave();
     }
   };
@@ -470,21 +481,25 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             </button>
           )}
 
-          {/* Guruhdan chiqish yoki xonani yakunlash */}
+          {/* Guruhdan chiqish yoki xonani tugatish (Har doim bosh sahifaga olib o'tadi) */}
           {isCreator ? (
             <button
+              type="button"
               onClick={handleDeleteRoom}
-              className="flex items-center gap-1 px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-lg text-xs font-semibold cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 hover:text-white rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-95 shadow-md"
+              title="Guruh poygasini butunlay tugatish va asosiy sahifaga qaytish"
             >
-              <Trash2 className="w-3 h-3" />
-              <span className="hidden sm:inline">Yakunlash</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Tugatish</span>
             </button>
           ) : (
             <button
-              onClick={onLeave}
-              className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold cursor-pointer"
+              type="button"
+              onClick={handleParticipantLeave}
+              className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-250 hover:text-white rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-95 shadow-md"
+              title="Guruhdan chiqish va asosiy sahifaga qaytish"
             >
-              <LogOut className="w-3 h-3" />
+              <LogOut className="w-3.5 h-3.5 text-rose-400" />
               <span>Chiqish</span>
             </button>
           )}
@@ -536,15 +551,23 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       {/* 3. Spidometr va Bir Qatorlik Yozish Konsoli */}
       <div className="pt-1">
         {isGameUnderway ? (
-          <WordsTypingArena
-            wordsList={wordsList}
-            onProgressUpdate={handleProgressUpdate}
-            onFinish={handleFinish}
-            isGameActive={true}
-            countdownActive={countdown !== null && countdown > 0}
-            startTimeMs={roomData?.startTimeMs || null}
-            selectedDistance={roomData?.targetDistance || 100}
-          />
+          (() => {
+            const myRacer = participants.find(p => p.isUser);
+            const myLiveRank = myRacer?.rank || 1;
+            return (
+              <WordsTypingArena
+                wordsList={wordsList}
+                onProgressUpdate={handleProgressUpdate}
+                onFinish={handleFinish}
+                isGameActive={true}
+                countdownActive={countdown !== null && countdown > 0}
+                startTimeMs={roomData?.startTimeMs || null}
+                selectedDistance={roomData?.targetDistance || 100}
+                userRank={myLiveRank}
+                totalRacers={participants.length}
+              />
+            );
+          })()
         ) : (
           <div className="p-3 sm:p-4 bg-[#091120]/95 border border-cyan-500/40 rounded-2xl shadow-xl backdrop-blur-md">
             {isCreator ? (

@@ -20,13 +20,13 @@ export const CarSprite: React.FC<CarSpriteProps> = ({
 
   return (
     <div className="relative flex flex-col items-center select-none pointer-events-none">
-      {/* Rank callout flag (rasmdagi yashil [#5 ▶] kabi aniq ko'rsatkich) */}
+      {/* Foydalanuvchi mashinasi ustidagi jonli o'rin nishoni (Aynan foydalanuvchining o'ziga ko'rinadi) */}
       {isUser && (
-        <div className="absolute -top-6 left-0 -translate-x-full pr-1.5 flex items-center z-30 animate-pulse">
-          <div className="px-1.5 py-0.5 bg-[#22c55e] text-black font-black text-[10px] font-mono rounded-sm shadow-md flex items-center justify-center">
-            #{rank}
+        <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center z-30 animate-pulse whitespace-nowrap">
+          <div className="px-2 py-0.5 bg-emerald-400 text-slate-950 font-black text-[10px] font-mono rounded-full shadow-[0_0_10px_#34d399] flex items-center gap-1 border border-emerald-300">
+            <span>{rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🏎️'}</span>
+            <span>Siz: {rank}-oʻrin</span>
           </div>
-          <div className="w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-l-[5px] border-l-[#22c55e]" />
         </div>
       )}
 
