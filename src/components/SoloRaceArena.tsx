@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { HighwayRaceTrack, HighwayRacer } from './HighwayRaceTrack';
-import { WordsTypingArena, DISTANCE_TARGETS } from './WordsTypingArena';
+import { WordsTypingArena, DISTANCE_TARGETS, getTargetCharsForDistance } from './WordsTypingArena';
 import { RaceResultsModal } from './RaceResultsModal';
 import { FinishCelebrationOverlay } from './FinishCelebrationOverlay';
 import { CarSelector } from './CarSelector';
@@ -165,7 +165,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
       return;
     }
 
-    const targetWords = (DISTANCE_TARGETS[selectedDistance] || 100) / 5;
+    const targetWords = getTargetCharsForDistance(selectedDistance) / 5;
     const botSpeeds: Record<string, number> = {};
     BOT_CONFIGS[difficulty].forEach(b => {
       botSpeeds[b.id] = b.wpm;

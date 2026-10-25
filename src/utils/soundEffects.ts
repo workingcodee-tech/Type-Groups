@@ -15,14 +15,18 @@ class SoundManager {
   }
 
   private initCtx() {
-    if (!this.ctx && typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
+    try {
+      if (!this.ctx && typeof window !== 'undefined') {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx();
+        }
       }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    } catch {
+      // AudioContext restriction on mobile
     }
   }
 
@@ -182,52 +186,60 @@ class SoundManager {
   }
 
   public playCountdown(count: number) {
-    if (this.soundType === 'off' || this.volume <= 0) return;
-    this.initCtx();
-    if (!this.ctx) return;
-
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    const freq = count === 0 ? 880 : 440; // GO chime is higher pitch
-    osc.frequency.setValueAtTime(freq, now);
-
-    gain.gain.setValueAtTime(this.volume * 0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + (count === 0 ? 0.35 : 0.15));
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + (count === 0 ? 0.35 : 0.15));
-  }
-
-  public playFinish() {
-    if (this.soundType === 'off' || this.volume <= 0) return;
-    this.initCtx();
-    if (!this.ctx) return;
-
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-    notes.forEach((freq, idx) => {
+    try {
+      if (this.soundType === 'off' || this.volume <= 0) return;
+      this.initCtx();
       if (!this.ctx) return;
-      const now = this.ctx.currentTime + idx * 0.1;
+
+      const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      osc.type = 'triangle';
+      osc.type = 'sine';
+      const freq = count === 0 ? 880 : 440; // GO chime is higher pitch
       osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(this.volume * 0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      gain.gain.setValueAtTime(this.volume * 0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (count === 0 ? 0.35 : 0.15));
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.3);
-    });
+      osc.stop(now + (count === 0 ? 0.35 : 0.15));
+    } catch {
+      // Audio playback fails gracefully without interrupting countdown
+    }
+  }
+
+  public playFinish() {
+    try {
+      if (this.soundType === 'off' || this.volume <= 0) return;
+      this.initCtx();
+      if (!this.ctx) return;
+
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime + idx * 0.1;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(this.volume * 0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.3);
+      });
+    } catch {
+      // Ignore finish sound errors
+    }
   }
 }
 

@@ -110,21 +110,21 @@ export default function App() {
   // Guruhga qo'shilish (6 raqamli ID orqali)
   const handleJoinGroup = async (roomId: string, userName: string, carId: string) => {
     setLoadingAction('Xonaga ulanilmoqda...');
-    setGlobalError(null);
-
     try {
       const roomRef = doc(db, 'rooms', roomId);
-      const roomSnap = await getDoc(roomRef);
+      const participantsRef = collection(db, 'rooms', roomId, 'participants');
+
+      // Tezkor parallel tekshirish (kechikishni 2 barobar kamaytiradi)
+      const [roomSnap, participantsSnap] = await Promise.all([
+        getDoc(roomRef),
+        getDocs(participantsRef)
+      ]);
 
       if (!roomSnap.exists()) {
         setGlobalError(`"${roomId}" raqamli xona topilmadi. 6 raqamli ID toʻgʻri kiritilganini tekshiring.`);
         setLoadingAction(null);
         return;
       }
-
-      // Xonadagi ishtirokchilar sonini tekshirish (ko'pi bilan 10 ta)
-      const participantsRef = collection(db, 'rooms', roomId, 'participants');
-      const participantsSnap = await getDocs(participantsRef);
 
       if (participantsSnap.size >= 10) {
         setGlobalError('Kechirasiz, ushbu guruh toʻlgan (maksimal 10 ta ishtirokchi).');
@@ -177,13 +177,14 @@ export default function App() {
   };
 
   // Yangi guruh yaratish (vaqtinchalik 6 raqamlik ID)
-  const handleCreateGroup = async (groupName: string, userName: string, carId: string) => {
+  const handleCreateGroup = async (groupName: string, userName: string, carId: string, targetDistance: number = 100) => {
     setLoadingAction('Yangi xona va 6 raqamlik ID yaratilmoqda...');
     setGlobalError(null);
 
     try {
       const random6DigitId = String(Math.floor(100000 + Math.random() * 900000));
-      const roomWords = generate5000Words();
+      const wordsCount = Math.max(30, Math.ceil(targetDistance / 4));
+      const roomWords = generate5000Words(wordsCount);
       const myId = currentUser.id;
 
       // Xona hujjatini yaratish
@@ -197,7 +198,7 @@ export default function App() {
         createdAt: new Date().toISOString(),
         words: roomWords,
         countdown: null,
-        targetDistance: 100,
+        targetDistance: targetDistance || 100,
         round: 1
       });
 

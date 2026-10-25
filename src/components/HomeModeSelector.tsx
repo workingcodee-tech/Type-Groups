@@ -15,7 +15,7 @@ interface HomeModeSelectorProps {
   onUpdateUser: (name: string, carId: string) => void;
   onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel) => void;
   onJoinGroup: (roomId: string, userName: string, carId: string) => void;
-  onCreateGroup: (groupName: string, userName: string, carId: string) => void;
+  onCreateGroup: (groupName: string, userName: string, carId: string, targetDistance?: number) => void;
   soundType: SwitchSoundType;
   onToggleSound: () => void;
   initialRoomId?: string;
@@ -35,6 +35,7 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
   const [selectedCarId, setSelectedCarId] = useState<string>(currentUser.carId || 'bmw');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
   const [groupName, setGroupName] = useState<string>('Tezkor Poygachilar');
+  const [targetDistance, setTargetDistance] = useState<number>(100);
   const [joinPin, setJoinPin] = useState<string>(initialRoomId);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [showCarModal, setShowCarModal] = useState<boolean>(false);
@@ -88,7 +89,7 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
     if (!validName) return;
 
     const gName = groupName.trim() || 'Tezkor Poygachilar';
-    onCreateGroup(gName, validName, selectedCarId);
+    onCreateGroup(gName, validName, selectedCarId, targetDistance);
   };
 
   const handleJoinClick = (e: React.FormEvent) => {
@@ -307,7 +308,7 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
               Doʻstlar uchun multiplayer xona oching, 6 raqamli xona kodini (PIN) oling va barchaga bir vaqtda start bering.
             </p>
 
-            <div className="space-y-1 mb-3">
+            <div className="space-y-1 mb-2.5">
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                 Guruh Nomi:
               </label>
@@ -319,6 +320,33 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
                 maxLength={30}
                 className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-lg text-white text-xs font-semibold outline-none"
               />
+            </div>
+
+            <div className="space-y-1 mb-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Trassa Masofasi:
+                </label>
+                <span className="text-[10px] font-mono font-bold text-cyan-400">
+                  {targetDistance} metr
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[50, 100, 200, 500].map((dist) => (
+                  <button
+                    key={dist}
+                    type="button"
+                    onClick={() => setTargetDistance(dist)}
+                    className={`py-1 px-1 rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                      targetDistance === dist
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/30'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {dist}m
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

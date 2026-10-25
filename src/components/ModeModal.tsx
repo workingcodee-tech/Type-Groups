@@ -10,7 +10,7 @@ interface ModeModalProps {
   onClose: () => void;
   onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel) => void;
   onJoinGroup: (roomId: string, userName: string, carId: string) => void;
-  onCreateGroup: (groupName: string, userName: string, carId: string) => void;
+  onCreateGroup: (groupName: string, userName: string, carId: string, targetDistance?: number) => void;
 }
 
 export const ModeModal: React.FC<ModeModalProps> = ({
@@ -32,6 +32,7 @@ export const ModeModal: React.FC<ModeModalProps> = ({
   const [selectedCarId, setSelectedCarId] = useState<string>('bmw');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
   const [groupName, setGroupName] = useState<string>('');
+  const [targetDistance, setTargetDistance] = useState<number>(100);
   const [roomIdInput, setRoomIdInput] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -65,7 +66,7 @@ export const ModeModal: React.FC<ModeModalProps> = ({
         setErrorMsg('Iltimos, yangi guruh nomini kiriting!');
         return;
       }
-      onCreateGroup(groupName.trim(), userName.trim(), selectedCarId);
+      onCreateGroup(groupName.trim(), userName.trim(), selectedCarId, targetDistance);
     }
   };
 
@@ -97,7 +98,7 @@ export const ModeModal: React.FC<ModeModalProps> = ({
             <p className="text-[11px] text-slate-400">
               {mode === 'solo' && 'Ismingiz va poyga mashinangizni tanlang'}
               {mode === 'join' && '6 raqamli xona ID sini kiriting va qoʻshiling'}
-              {mode === 'create' && 'Guruh nomini kiriting va 6 raqamlik ID oling'}
+              {mode === 'create' && 'Guruh nomini kiriting va masofani belgilang'}
             </p>
           </div>
         </div>
@@ -113,19 +114,46 @@ export const ModeModal: React.FC<ModeModalProps> = ({
         {/* Asosiy Forma */}
         <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1">
           {mode === 'create' && (
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                Guruh Nomi:
-              </label>
-              <input
-                type="text"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Masalan: Samarqand Shiddatkorlari"
-                required
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-cyan-400"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Guruh Nomi:
+                </label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Masalan: Samarqand Shiddatkorlari"
+                  required
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-slate-300">
+                    Poyga Masofasi:
+                  </label>
+                  <span className="text-[11px] font-mono font-bold text-cyan-400">{targetDistance} metr</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[50, 100, 200, 500].map((dist) => (
+                    <button
+                      key={dist}
+                      type="button"
+                      onClick={() => setTargetDistance(dist)}
+                      className={`py-1 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer ${
+                        targetDistance === dist
+                          ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {dist}m
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
 
           {mode === 'join' && (

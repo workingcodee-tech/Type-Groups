@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { RotateCcw, Share2, Award, ArrowRight, Zap, Target, Clock, Activity, CheckCircle2, AlertTriangle, Hash, Trophy } from 'lucide-react';
+import { RotateCcw, Share2, Award, ArrowRight, Zap, Target, Clock, Activity, CheckCircle2, AlertTriangle, Hash, Trophy, Keyboard } from 'lucide-react';
 import { RaceStats, Participant } from '../types';
 import { sortRacersByRank } from '../utils/raceRanking';
 
@@ -126,17 +126,17 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
             </div>
           </div>
 
-          {/* 2. Bosib o'tilgan masofa va belgilar */}
+          {/* 2. Yozilgan belgilar va harflar soni */}
           <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl text-center">
             <div className="flex items-center justify-center gap-1 text-slate-400 text-xs mb-1">
-              <Hash className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Bosib Oʻtilgan Masofa</span>
+              <Keyboard className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Yozilgan Belgilar</span>
             </div>
             <div className="text-2xl sm:text-3xl font-extrabold text-cyan-400 font-mono-numbers">
-              {stats.distanceMeters || 100} <span className="text-xs text-slate-400 font-normal">metr</span>
+              {stats.totalChars} <span className="text-xs text-slate-400 font-normal">ta</span>
             </div>
             <div className="text-[11px] text-slate-400 mt-1 font-mono-numbers">
-              Belgilar: {stats.totalChars} ta ({stats.correctChars} toʻgʻri)
+              {stats.correctChars} toʻgʻri · {stats.distanceMeters || 100}m
             </div>
           </div>
 

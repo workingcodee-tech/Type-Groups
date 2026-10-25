@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, RotateCcw, ArrowRight, Zap, Target, Clock, Award, BarChart3, Flame } from 'lucide-react';
+import { Trophy, RotateCcw, ArrowRight, Zap, Target, Clock, Award, BarChart3, Flame, Keyboard } from 'lucide-react';
 import { RaceStats, Participant } from '../types';
 import { sounds } from '../utils/soundEffects';
 import { sortRacersByRank } from '../utils/raceRanking';
@@ -28,6 +28,7 @@ export const FinishCelebrationOverlay: React.FC<FinishCelebrationOverlayProps> =
 }) => {
   const [animatedWpm, setAnimatedWpm] = useState(0);
   const [animatedSeconds, setAnimatedSeconds] = useState(0);
+  const [animatedChars, setAnimatedChars] = useState(0);
 
   const sortedRacers = sortRacersByRank(participants);
 
@@ -89,6 +90,7 @@ export const FinishCelebrationOverlay: React.FC<FinishCelebrationOverlayProps> =
   useEffect(() => {
     const targetWpm = stats.wpm || 0;
     const targetSec = stats.timeSeconds || 0;
+    const targetChars = stats.totalChars || 0;
 
     const duration = 1000;
     const steps = 30;
@@ -100,16 +102,18 @@ export const FinishCelebrationOverlay: React.FC<FinishCelebrationOverlayProps> =
       const progress = step / steps;
       setAnimatedWpm(Math.round(targetWpm * progress));
       setAnimatedSeconds(Number((targetSec * progress).toFixed(1)));
+      setAnimatedChars(Math.round(targetChars * progress));
 
       if (step >= steps) {
         clearInterval(interval);
         setAnimatedWpm(targetWpm);
         setAnimatedSeconds(targetSec);
+        setAnimatedChars(targetChars);
       }
     }, stepDuration);
 
     return () => clearInterval(interval);
-  }, [stats.wpm, stats.timeSeconds]);
+  }, [stats.wpm, stats.timeSeconds, stats.totalChars]);
 
   // Tab va Enter bilan tezda qayta boshlash
   useEffect(() => {
@@ -191,42 +195,68 @@ export const FinishCelebrationOverlay: React.FC<FinishCelebrationOverlayProps> =
           </p>
         </div>
 
-        {/* 3. Jonli Animatsiyali Asosiy Ko'rsatkichlar */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full mb-5">
+        {/* 3. Jonli Animatsiyali Asosiy Ko'rsatkichlar (Tezlik, Vaqt, Harflar, Aniqlik) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 w-full mb-3">
           {/* Tezlik (WPM) */}
-          <div className="p-3 bg-slate-950/80 border border-cyan-500/40 rounded-2xl flex flex-col items-center shadow-lg">
-            <div className="flex items-center gap-1 text-[11px] text-cyan-400 font-bold mb-0.5">
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+          <div className="p-2.5 bg-slate-950/80 border border-cyan-500/40 rounded-2xl flex flex-col items-center shadow-lg">
+            <div className="flex items-center gap-1 text-[10px] text-cyan-400 font-bold mb-0.5">
+              <Zap className="w-3 h-3 text-cyan-400" />
               <span>TEZLIK</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-mono text-white">
+            <div className="text-xl sm:text-2xl font-black font-mono text-white">
               {animatedWpm}
             </div>
-            <span className="text-[10px] text-slate-400 font-mono font-semibold">WPM</span>
+            <span className="text-[9px] text-slate-400 font-mono font-semibold">WPM</span>
           </div>
 
           {/* Vaqt (Sekund) */}
-          <div className="p-3 bg-slate-950/80 border border-emerald-500/40 rounded-2xl flex flex-col items-center shadow-lg">
-            <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-bold mb-0.5">
-              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="p-2.5 bg-slate-950/80 border border-emerald-500/40 rounded-2xl flex flex-col items-center shadow-lg">
+            <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold mb-0.5">
+              <Clock className="w-3 h-3 text-emerald-400" />
               <span>VAQT</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-300">
+            <div className="text-xl sm:text-2xl font-black font-mono text-emerald-300">
               {animatedSeconds}s
             </div>
-            <span className="text-[10px] text-slate-400 font-mono font-semibold">soniya</span>
+            <span className="text-[9px] text-slate-400 font-mono font-semibold">soniya</span>
+          </div>
+
+          {/* Yozilgan Harflar / Belgilar soni */}
+          <div className="p-2.5 bg-slate-950/80 border border-blue-500/40 rounded-2xl flex flex-col items-center shadow-lg">
+            <div className="flex items-center gap-1 text-[10px] text-blue-400 font-bold mb-0.5">
+              <Keyboard className="w-3 h-3 text-blue-400" />
+              <span>HARFLAR</span>
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-blue-300">
+              {animatedChars} <span className="text-xs font-normal text-slate-400">ta</span>
+            </div>
+            <span className="text-[9px] text-slate-400 font-mono font-semibold">belgi</span>
           </div>
 
           {/* Aniqlik */}
-          <div className="p-3 bg-slate-950/80 border border-amber-500/40 rounded-2xl flex flex-col items-center shadow-lg">
-            <div className="flex items-center gap-1 text-[11px] text-amber-400 font-bold mb-0.5">
-              <Target className="w-3.5 h-3.5 text-amber-400" />
+          <div className="p-2.5 bg-slate-950/80 border border-amber-500/40 rounded-2xl flex flex-col items-center shadow-lg">
+            <div className="flex items-center gap-1 text-[10px] text-amber-400 font-bold mb-0.5">
+              <Target className="w-3 h-3 text-amber-400" />
               <span>ANIQLIK</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-mono text-amber-300">
+            <div className="text-xl sm:text-2xl font-black font-mono text-amber-300">
               {stats.accuracy}%
             </div>
-            <span className="text-[10px] text-slate-400 font-mono font-semibold">toʻgʻri</span>
+            <span className="text-[9px] text-slate-400 font-mono font-semibold">toʻgʻri</span>
+          </div>
+        </div>
+
+        {/* Belgilar tafsiloti paneli */}
+        <div className="w-full py-1.5 px-3 mb-4 rounded-xl bg-[#091526]/90 border border-cyan-500/30 flex items-center justify-between text-xs font-mono shadow-inner">
+          <div className="flex items-center gap-1.5 text-cyan-300 font-bold text-[11px] sm:text-xs">
+            <Keyboard className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Yozilgan Belgilar (Harflar):</span>
+          </div>
+          <div className="text-white font-bold text-[11px] sm:text-xs">
+            <span className="text-cyan-300 font-black">{stats.totalChars} ta belgi</span>{' '}
+            <span className="text-emerald-400 text-[10px] sm:text-[11px]">({stats.correctChars} toʻgʻri</span>
+            <span className="text-slate-400 text-[10px] sm:text-[11px]"> · </span>
+            <span className="text-rose-400 text-[10px] sm:text-[11px]">{stats.incorrectChars} xato)</span>
           </div>
         </div>
 

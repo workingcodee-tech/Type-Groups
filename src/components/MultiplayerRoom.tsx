@@ -128,44 +128,56 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     };
   }, [roomId, myId]);
 
-  // 3. Millisekundlik aniq sinxron 3-2-1 hisoblagich (Barcha guruh a'zolarida bir paytda ishlaydi)
+  // 3. Sinxron va qotib qolmaydigan (anti-freeze) 3-2-1 START hisoblagich
   useEffect(() => {
-    const startTimeMs = roomData?.startTimeMs;
-    if (!startTimeMs) {
+    // Agar status 'racing' bo'lsa (poyga allaqachon ketmoqda), countdown darhol tugaydi
+    if (roomData?.status === 'racing') {
       setCountdown(null);
       playedCountdownRef.current = null;
       return;
     }
 
-    const syncInterval = window.setInterval(() => {
-      const now = Date.now();
-      const diffMs = startTimeMs - now;
+    // Faqat 'starting' holatida hisoblagich ishlaydi
+    if (roomData?.status !== 'starting') {
+      setCountdown(null);
+      playedCountdownRef.current = null;
+      return;
+    }
 
-      if (diffMs > 3000) {
+    const now = Date.now();
+    const serverStartMs = roomData?.startTimeMs;
+    // Qurilmalar o'rtasidagi soat tafovutini (skew) bartaraf etish:
+    // Agar server vaqti juda katta yoki o'tib ketgan bo'lsa, mahalliy 3.4 soniyalik aniq taymer ishlatiladi
+    const diff = serverStartMs ? serverStartMs - now : 3400;
+    const targetEndTime = (diff > 0 && diff <= 4500) ? serverStartMs : (now + 3400);
+
+    // Xavfsizlik nazoratchisi (Watchdog): Mobil qurilma hech qachon '3' da qotib qolmasligini 100% kafolatlaydi!
+    const watchdog = window.setTimeout(() => {
+      setCountdown(null);
+    }, 4000);
+
+    const syncInterval = window.setInterval(() => {
+      const remainingMs = targetEndTime - Date.now();
+
+      if (remainingMs > 2000) {
         setCountdown(3);
         if (playedCountdownRef.current !== 3) {
           playedCountdownRef.current = 3;
           sounds.playCountdown(3);
         }
-      } else if (diffMs > 2000) {
-        setCountdown(3);
-        if (playedCountdownRef.current !== 3) {
-          playedCountdownRef.current = 3;
-          sounds.playCountdown(3);
-        }
-      } else if (diffMs > 1000) {
+      } else if (remainingMs > 1000) {
         setCountdown(2);
         if (playedCountdownRef.current !== 2) {
           playedCountdownRef.current = 2;
           sounds.playCountdown(2);
         }
-      } else if (diffMs > 0) {
+      } else if (remainingMs > 0) {
         setCountdown(1);
         if (playedCountdownRef.current !== 1) {
           playedCountdownRef.current = 1;
           sounds.playCountdown(1);
         }
-      } else if (diffMs > -1200) {
+      } else if (remainingMs > -700) {
         // Start signali: 0 -> GO!
         setCountdown(0);
         if (playedCountdownRef.current !== 0) {
@@ -175,10 +187,13 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       } else {
         setCountdown(null);
       }
-    }, 30);
+    }, 40);
 
-    return () => clearInterval(syncInterval);
-  }, [roomData?.startTimeMs]);
+    return () => {
+      clearInterval(syncInterval);
+      clearTimeout(watchdog);
+    };
+  }, [roomData?.status, roomData?.startTimeMs]);
 
   // Foydalanuvchi yozayotgan paytda progressni bazaga yuborish
   const handleProgressUpdate = React.useCallback(async (progress: number, wpm: number, accuracy: number, totalChars: number, errors: number) => {
@@ -212,9 +227,11 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     // Mendan oldin marraga yetganlar soni
     const alreadyFinishedRacers = participants.filter(p => !p.isUser && p.finished);
     const myRealRank = alreadyFinishedRacers.length + 1;
+    const currentDistance = roomData?.targetDistance || 100;
 
     setRaceStats({
       ...stats,
+      distanceMeters: currentDistance,
       userRank: myRealRank,
       totalRacers: participants.length
     });
@@ -239,20 +256,47 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     } catch (e) {
       console.warn("Marrani saqlashda xatolik:", e);
     }
-  }, [roomId, myId, participants]);
+  }, [roomId, myId, participants, roomData?.targetDistance]);
+
+  // Guruh egasi (host) poyga boshlanishidan oldin masofani belgilashi
+  const handleSetTargetDistance = async (newDistance: number) => {
+    if (!isCreator || newDistance < 20) return;
+    try {
+      const wordsCount = Math.max(30, Math.ceil(newDistance / 4));
+      const newWords = generate5000Words(wordsCount);
+      const roomRef = doc(db, 'rooms', roomId);
+      await updateDoc(roomRef, {
+        targetDistance: newDistance,
+        words: newWords
+      });
+    } catch (e) {
+      console.warn("Masofani yangilashda xatolik:", e);
+    }
+  };
 
   // 1-bosqich: Birinchi poygani boshlash (Faqat xona yaratuvchisi boshlaydi)
   const handleStartRace = async () => {
     if (!isCreator) return;
     try {
       const roomRef = doc(db, 'rooms', roomId);
-      // Barcha a'zolarga yetib borishi va aniq bir xil millisekundda start olishi uchun 4.2 soniya oldinga belgilanadi
-      const startMs = Date.now() + 4200;
+      // Barcha a'zolarga yetib borishi va aniq bir xil vaqtda start olishi uchun 3.5 soniya hisoblanadi
+      const startMs = Date.now() + 3500;
       await updateDoc(roomRef, {
         status: 'starting',
         startTimeMs: startMs,
         startedAt: new Date().toISOString()
       });
+
+      // 3.5 soniyadan so'ng poyga holati 'racing' ga o'tadi (barcha mobil va kompyuter a'zolarida bir paytda start oladi)
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, {
+            status: 'racing'
+          });
+        } catch {
+          // ignore
+        }
+      }, 3500);
     } catch (e) {
       console.warn("Poygani boshlashda xatolik:", e);
     }
@@ -265,10 +309,10 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
 
     try {
       const targetMeters = roomData?.targetDistance || 100;
-      const targetWordsCount = targetMeters === 1000 ? 170 : targetMeters === 500 ? 90 : 35;
+      const targetWordsCount = Math.max(30, Math.ceil(targetMeters / 4));
       const newWords = generate5000Words(targetWordsCount);
       const nextRoundNumber = (roomData?.round || 1) + 1;
-      const nextStartMs = Date.now() + 4200;
+      const nextStartMs = Date.now() + 3500;
 
       // Barcha ishtirokchilarning natijalarini tozalash (reset qilish)
       const participantsRef = collection(db, 'rooms', roomId, 'participants');
@@ -300,6 +344,17 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
         startedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
+
+      // 3.5 soniyadan so'ng barcha o'yinchilar uchun poyga start oladi
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, {
+            status: 'racing'
+          });
+        } catch {
+          // ignore
+        }
+      }, 3500);
     } catch (e) {
       console.warn("Keyingi bosqichga o'tishda xatolik:", e);
     } finally {
@@ -380,6 +435,9 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400 font-mono">
             <Users className="w-3 h-3 text-cyan-400" />
             <span>{participants.length}/10</span>
+          </div>
+          <div className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-500/50 rounded-md text-[11px] font-mono font-bold text-emerald-300">
+            🏁 {roomData?.targetDistance || 100}m
           </div>
           {roomData?.round && roomData.round > 1 && (
             <div className="px-2 py-0.5 bg-cyan-950 border border-cyan-500/50 rounded-md text-[11px] font-mono font-bold text-cyan-300">
@@ -488,12 +546,92 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             selectedDistance={roomData?.targetDistance || 100}
           />
         ) : (
-          <div className="p-3 bg-[#0d1420] border border-slate-800 rounded-xl text-center">
-            <span className="text-xs sm:text-sm font-bold text-white font-mono">
-              {isCreator
-                ? '🎮 Oʻyinchilar qoʻshilishini kuting va yuqoridagi "START RACE" tugmasini bosing'
-                : '⏳ Xona yaratuvchisi poygani boshlashini kuting... (Faqat yaratuvchi boshqaradi)'}
-            </span>
+          <div className="p-3 sm:p-4 bg-[#091120]/95 border border-cyan-500/40 rounded-2xl shadow-xl backdrop-blur-md">
+            {isCreator ? (
+              <div className="flex flex-col gap-3">
+                {/* Yuqori qism: Host sarlavhasi va Start tugmasi */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-850">
+                  <div className="text-left">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">👑</span>
+                      <h4 className="text-xs sm:text-sm font-black text-white font-mono flex items-center gap-1.5">
+                        Guruh Egasi Boshqaruvi
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 font-bold border border-emerald-500/50">
+                          HOST
+                        </span>
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Barcha ishtirokchilar uchun trassa masofasini belgilang va poygani boshlang:
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleStartRace}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-500/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 animate-pulse"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>START RACE (Barcha uchun)</span>
+                  </button>
+                </div>
+
+                {/* Masofani tanlash bloki: 50m, 100m, 200m, 500m, 1000m */}
+                <div className="text-left">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                      <span>🏁</span> Trassa Masofasi (Necha metr yuriladi):
+                    </span>
+                    <span className="text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-lg border border-cyan-500/50">
+                      {roomData?.targetDistance || 100} METR
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {[50, 100, 200, 500, 1000].map((dist) => {
+                      const isSelected = (roomData?.targetDistance || 100) === dist;
+                      return (
+                        <button
+                          key={dist}
+                          type="button"
+                          onClick={() => handleSetTargetDistance(dist)}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                            isSelected
+                              ? 'bg-gradient-to-b from-cyan-500 to-blue-600 text-slate-950 border-cyan-300 shadow-md shadow-cyan-500/30 ring-1 ring-cyan-400 scale-[1.02]'
+                              : 'bg-slate-900/90 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600'
+                          }`}
+                        >
+                          <span className="text-sm font-black">{dist}m</span>
+                          <span className={`text-[10px] font-sans ${isSelected ? 'text-slate-950 font-bold' : 'text-slate-400'}`}>
+                            {dist === 50 ? 'Tezkor (50m)' : dist === 100 ? 'Standart (100m)' : dist === 200 ? 'Oʻrta (200m)' : dist === 500 ? 'Uzoq (500m)' : 'Marafon (1km)'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-white font-mono flex items-center gap-1.5">
+                      Guruh Poygasi Kutilmoqda
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Guruh egasi ({roomData?.creatorName || 'Host'}) start berishi bilan barchada bir vaqtda poyga boshlanadi.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan-950/80 border border-cyan-500/50 rounded-xl text-cyan-300 text-xs font-mono font-bold shrink-0">
+                  <span>🏁 Masofa:</span>
+                  <span className="text-white font-black text-sm">{roomData?.targetDistance || 100} metr</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -23,9 +23,16 @@ interface WordHistoryItem {
 
 // Masofa bo'yicha talab qilinadigan to'g'ri belgilar soni
 export const DISTANCE_TARGETS: Record<number, number> = {
+  50: 50,    // ~10 so'z
   100: 100,  // ~20 so'z
+  200: 190,  // ~38 so'z
   500: 450,  // ~80 so'z
   1000: 850  // ~160 so'z
+};
+
+export const getTargetCharsForDistance = (meters: number): number => {
+  if (DISTANCE_TARGETS[meters]) return DISTANCE_TARGETS[meters];
+  return Math.max(25, Math.round(meters * 0.9));
 };
 
 export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
@@ -76,7 +83,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     }
   }, [externalDistance, distance]);
 
-  const targetChars = DISTANCE_TARGETS[distance] || 100;
+  const targetChars = getTargetCharsForDistance(distance);
 
   const countdownActiveRef = useRef(countdownActive);
   countdownActiveRef.current = countdownActive;
@@ -89,7 +96,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     }
     setCurrentWordIndex(0);
     setCurrentInput('');
-    setStartTime(startTimeMs || null);
+    setStartTime(null);
     setElapsedTime(0);
     setIsFinished(false);
     setTotalCorrectChars(0);
@@ -100,32 +107,22 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     setScrollX(0);
 
     setTimeout(() => {
-      const now = Date.now();
-      const isBeforeStart = startTimeMs ? now < startTimeMs : countdownActiveRef.current;
-      if (!isBeforeStart) {
+      if (!countdownActiveRef.current) {
         inputRef.current?.focus();
       }
     }, 50);
-  }, [startTimeMs]);
+  }, []);
 
   useEffect(() => {
     handleReset();
   }, [wordsList, handleReset]);
 
-  // startTimeMs va countdown kuzatuvi: vaqt kelishi bilan avtomatik fokus qilish
+  // Countdown tugashi bilan darhol inputga fokus qilish (Mobil va kompyuter uchun birdek)
   useEffect(() => {
-    if (startTimeMs && isGameActive && !isFinished) {
-      const checkFocus = setInterval(() => {
-        if (Date.now() >= startTimeMs) {
-          inputRef.current?.focus();
-          clearInterval(checkFocus);
-        }
-      }, 50);
-      return () => clearInterval(checkFocus);
-    } else if (!countdownActive && isGameActive && !isFinished) {
+    if (!countdownActive && isGameActive && !isFinished) {
       inputRef.current?.focus();
     }
-  }, [startTimeMs, countdownActive, isGameActive, isFinished]);
+  }, [countdownActive, isGameActive, isFinished]);
 
   // Foydalanuvchi qo'lda tugma bosganda qayta boshlash
   const handleManualRestart = useCallback(() => {
@@ -190,17 +187,15 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
   // Taymer hisobi: Sekundomer 0:00.0 dan yuqoriga qarab sanaydi
   useEffect(() => {
-    const isLocked = (startTimeMs && Date.now() < startTimeMs) || countdownActive;
-    if (!isFinished && isGameActive && !isLocked) {
-      const activeStart = startTime || startTimeMs || Date.now();
+    if (!isFinished && isGameActive && !countdownActive) {
+      const activeStart = startTime || Date.now();
       if (!startTime) {
         setStartTime(activeStart);
       }
 
       timerRef.current = window.setInterval(() => {
         const now = Date.now();
-        const base = startTimeMs || activeStart;
-        const seconds = Math.max(0, (now - base) / 1000);
+        const seconds = Math.max(0, (now - activeStart) / 1000);
         setElapsedTime(seconds);
 
         const minutes = Math.max(0.01, seconds / 60);
@@ -214,7 +209,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
         clearInterval(timerRef.current);
       }
     };
-  }, [startTime, startTimeMs, isFinished, isGameActive, countdownActive, totalCorrectChars]);
+  }, [startTime, isFinished, isGameActive, countdownActive, totalCorrectChars]);
 
   // Single-line Gorizontal silliq siljish (Aktiv so'zni ekran kengligiga mos chapdan ushlab turadi)
   useEffect(() => {
@@ -487,15 +482,15 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
           </span>
         </div>
 
-        {/* O'rtada Masofa tanlash tugmalari: 100m, 500m, 1000m */}
+        {/* O'rtada Masofa tanlash tugmalari: 50m, 100m, 200m, 500m, 1000m */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 p-0.5 bg-slate-950/90 border border-slate-800 rounded-lg shadow-inner">
-            {[100, 500, 1000].map((dist) => (
+            {[50, 100, 200, 500, 1000].map((dist) => (
               <button
                 key={dist}
                 disabled={countdownActive || (startTime !== null && !isFinished)}
                 onClick={() => handleSelectDistance(dist)}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   distance === dist
                     ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                     : 'text-slate-400 hover:text-white'
