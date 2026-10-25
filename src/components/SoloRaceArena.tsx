@@ -2,17 +2,25 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { HighwayRaceTrack, HighwayRacer } from './HighwayRaceTrack';
 import { WordsTypingArena, DISTANCE_TARGETS } from './WordsTypingArena';
 import { RaceResultsModal } from './RaceResultsModal';
+import { FinishCelebrationOverlay } from './FinishCelebrationOverlay';
+import { CarSelector } from './CarSelector';
 import { generate5000Words } from '../data/words';
 import { RaceStats, DifficultyLevel } from '../types';
-import { LogOut } from 'lucide-react';
+import { Users, Volume2, VolumeX, Sparkles, X, Check, Edit3 } from 'lucide-react';
 import { FAMOUS_CARS } from '../data/cars';
-import { sounds } from '../utils/soundEffects';
+import { sounds, SwitchSoundType } from '../utils/soundEffects';
+import { sortRacersByRank } from '../utils/raceRanking';
 
 interface SoloRaceArenaProps {
   userName: string;
   carId: string;
   initialDifficulty?: DifficultyLevel;
-  onBack: () => void;
+  onBack?: () => void;
+  onOpenMultiplayer?: () => void;
+  onChangeCar?: (newCarId: string) => void;
+  onChangeName?: (newName: string) => void;
+  soundType?: SwitchSoundType;
+  onToggleSound?: () => void;
 }
 
 // 3 xil qiyinlik darajasidagi botlar parametrlari (foydalanuvchilar qulay yutishi uchun sezilarli sekinlashtirilgan)
@@ -38,10 +46,21 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
   userName,
   carId,
   initialDifficulty = 'medium',
-  onBack
+  onBack,
+  onOpenMultiplayer,
+  onChangeCar,
+  onChangeName,
+  soundType,
+  onToggleSound
 }) => {
   const [wordsList, setWordsList] = useState<string[]>(() => generate5000Words());
   const [raceStats, setRaceStats] = useState<RaceStats | null>(null);
+  const [showCelebration, setShowCelebration] = useState<boolean>(false);
+  const [showDetailedModal, setShowDetailedModal] = useState<boolean>(false);
+  const [isCarModalOpen, setIsCarModalOpen] = useState<boolean>(false);
+  const [isNameModalOpen, setIsNameModalOpen] = useState<boolean>(false);
+  const [tempName, setTempName] = useState<string>(userName);
+
   const [selectedDistance, setSelectedDistance] = useState<number>(100);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>(initialDifficulty);
 
@@ -174,14 +193,8 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
           };
         });
 
-        // O'rinlarni hisoblash
-        const sorted = [...updated].sort((a, b) => {
-          if (a.finished && b.finished) {
-            return (a.finishTime || 999) - (b.finishTime || 999);
-          }
-          return (b.progress - a.progress) || (b.currentWpm - a.currentWpm);
-        });
-
+        // O'rinlarni aniq hisoblash
+        const sorted = sortRacersByRank(updated);
         const rankMap = new Map(sorted.map((r, i) => [r.id, i + 1]));
 
         return updated.map((r) => ({
@@ -219,13 +232,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
         };
       });
 
-      const sorted = [...updated].sort((a, b) => {
-        if (a.finished && b.finished) {
-          return (a.finishTime || 999) - (b.finishTime || 999);
-        }
-        return (b.progress - a.progress) || (b.currentWpm - a.currentWpm);
-      });
-
+      const sorted = sortRacersByRank(updated);
       const rankMap = new Map(sorted.map((r, i) => [r.id, i + 1]));
 
       return updated.map((r) => ({
@@ -245,6 +252,8 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
         userRank,
         totalRacers: current.length
       });
+      setShowCelebration(true);
+      setShowDetailedModal(false);
       return current;
     });
     setIsRaceActive(false);
@@ -252,6 +261,8 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
 
   const handleRestartRace = useCallback(() => {
     setRaceStats(null);
+    setShowCelebration(false);
+    setShowDetailedModal(false);
     setWordsList(generate5000Words());
     startCountdown();
   }, [startCountdown]);
@@ -259,35 +270,64 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
   const handleDistanceChange = useCallback((dist: number) => {
     setSelectedDistance(dist);
     setRaceStats(null);
+    setShowCelebration(false);
+    setShowDetailedModal(false);
     startCountdown();
   }, [startCountdown]);
 
   const handleDifficultyChange = useCallback((newDiff: DifficultyLevel) => {
     setDifficulty(newDiff);
     setRaceStats(null);
+    setShowCelebration(false);
+    setShowDetailedModal(false);
     setWordsList(generate5000Words());
   }, []);
 
+  const handleSaveName = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tempName.trim()) {
+      if (onChangeName) onChangeName(tempName.trim());
+      try {
+        localStorage.setItem('tg_user_name', tempName.trim());
+      } catch {
+        // ignore
+      }
+      setIsNameModalOpen(false);
+    }
+  };
+
   return (
     <div className="w-full h-full max-w-5xl mx-auto flex flex-col justify-between py-1 px-2 select-none relative">
-      {/* 1. Kichik chiqish tugmasi, qiyinlik darajasi va poyga sozlamalari */}
-      <div className="flex items-center justify-between px-1 py-0.5 flex-wrap gap-1">
+      {/* 1. ARCADE HUD: Logo, Guruh poygasi, Qiyinlik, Mashina va Ovoz sozlamalari */}
+      <div className="flex items-center justify-between px-1 py-1 flex-wrap gap-2 bg-slate-950/70 border border-slate-800/80 rounded-2xl shadow-xl backdrop-blur-md">
+        {/* Chap tomon: Logo va Guruh rejimi */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-slate-400 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-lg transition-colors cursor-pointer"
-          >
-            <LogOut className="w-3 h-3 text-rose-400" />
-            <span>Chiqish</span>
-          </button>
+          {/* O'yin Logosi */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/40 rounded-xl">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-black tracking-tight text-white font-mono">
+              TYPE <span className="text-emerald-400">GROUPS</span>
+            </span>
+          </div>
+
+          {/* Guruhga o'tish (Multiplayer) tugmasi */}
+          {onOpenMultiplayer && (
+            <button
+              type="button"
+              onClick={onOpenMultiplayer}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/80 border border-cyan-500/50 rounded-xl transition-all shadow-md shadow-cyan-950/40 cursor-pointer active:scale-95"
+            >
+              <Users className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Guruh (Multiplayer)</span>
+            </button>
+          )}
 
           {/* Qiyinlik darajasini almashtirish: Oson / O'rta / Qiyin */}
-          <div className="flex items-center p-0.5 bg-slate-950/90 border border-slate-800 rounded-lg text-[10px] font-bold">
-            <span className="px-1.5 text-slate-400 font-semibold hidden sm:inline">Daraja:</span>
+          <div className="flex items-center p-0.5 bg-slate-900/90 border border-slate-800 rounded-xl text-[10px] font-bold">
             <button
               type="button"
               onClick={() => handleDifficultyChange('easy')}
-              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
                 difficulty === 'easy'
                   ? 'bg-emerald-500 text-slate-950 font-black shadow-sm shadow-emerald-500/30'
                   : 'text-slate-400 hover:text-slate-200'
@@ -298,7 +338,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
             <button
               type="button"
               onClick={() => handleDifficultyChange('medium')}
-              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
                 difficulty === 'medium'
                   ? 'bg-amber-400 text-slate-950 font-black shadow-sm shadow-amber-400/30'
                   : 'text-slate-400 hover:text-slate-200'
@@ -309,7 +349,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
             <button
               type="button"
               onClick={() => handleDifficultyChange('hard')}
-              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
                 difficulty === 'hard'
                   ? 'bg-rose-500 text-white font-black shadow-sm shadow-rose-500/30'
                   : 'text-slate-400 hover:text-slate-200'
@@ -320,12 +360,53 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
           </div>
         </div>
 
-        <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
-          <span>🏎️ <strong className="text-white">{selectedCar.name}</strong></span>
-          <span className="text-slate-600">·</span>
-          <span>👤 <strong className="text-cyan-300">{userName}</strong></span>
-          <span className="text-slate-600">·</span>
-          <span className="px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 font-bold">
+        {/* O'ng tomon: Mashina, Ism, Ovoz va Masofa */}
+        <div className="flex items-center gap-2 text-xs font-mono">
+          {/* Mashina tanlash tugmasi */}
+          <button
+            type="button"
+            onClick={() => setIsCarModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-slate-200 cursor-pointer transition-colors active:scale-95"
+            title="Mashinani almashtirish"
+          >
+            <span
+              className="w-2.5 h-2.5 rounded-full border border-slate-600 shrink-0"
+              style={{ backgroundColor: selectedCar.bodyColor }}
+            />
+            <span className="font-bold text-white max-w-[80px] sm:max-w-none truncate">{selectedCar.name.split(' ')[0]}</span>
+            <span className="text-[10px] text-slate-400">▾</span>
+          </button>
+
+          {/* Foydalanuvchi ismi */}
+          <button
+            type="button"
+            onClick={() => setIsNameModalOpen(true)}
+            className="flex items-center gap-1 px-2 py-1 bg-slate-900/80 hover:bg-slate-850 border border-slate-800 rounded-xl text-cyan-300 font-bold cursor-pointer transition-colors"
+            title="Ismni o'zgartirish"
+          >
+            <span>👤</span>
+            <span className="max-w-[70px] sm:max-w-none truncate">{userName}</span>
+            <Edit3 className="w-2.5 h-2.5 text-slate-500" />
+          </button>
+
+          {/* Ovoz sozlamasi */}
+          {onToggleSound && (
+            <button
+              type="button"
+              onClick={onToggleSound}
+              className="p-1.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white rounded-xl cursor-pointer transition-colors"
+              title="Ovozni almashtirish"
+            >
+              {soundType === 'off' ? (
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              )}
+            </button>
+          )}
+
+          {/* Tanlangan Masofa */}
+          <span className="px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-bold text-[11px]">
             🏁 {selectedDistance}m
           </span>
         </div>
@@ -392,8 +473,39 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
         />
       </div>
 
-      {/* Natijalar modali */}
-      {raceStats && (
+      {/* 1. Poyga yakunida Chiroyli G'alaba Animatsiyasi (FinishCelebrationOverlay) */}
+      {raceStats && showCelebration && (
+        <FinishCelebrationOverlay
+          stats={raceStats}
+          participants={racers.map(r => ({
+            id: r.id,
+            name: r.name,
+            avatar: '🏎️',
+            isUser: r.isUser,
+            progress: r.progress,
+            currentWpm: r.currentWpm,
+            rawWpm: r.currentWpm,
+            accuracy: r.accuracy,
+            finished: r.finished,
+            finishTimeSeconds: r.finishTime,
+            rank: r.rank,
+            color: selectedCar.bodyColor
+          }))}
+          onRestart={handleRestartRace}
+          onOpenDetailedStats={() => {
+            setShowCelebration(false);
+            setShowDetailedModal(true);
+          }}
+          onNextDifficulty={() => {
+            const nextDiff: DifficultyLevel = difficulty === 'easy' ? 'medium' : difficulty === 'medium' ? 'hard' : 'easy';
+            handleDifficultyChange(nextDiff);
+            startCountdown();
+          }}
+        />
+      )}
+
+      {/* 2. Batafsil Natijalar Modali (Foydalanuvchi "Batafsil" tugmasini bossa) */}
+      {raceStats && showDetailedModal && (
         <RaceResultsModal
           stats={raceStats}
           participants={racers.map(r => ({
@@ -415,6 +527,88 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
           onSaveScore={() => {}}
           hasSaved={true}
         />
+      )}
+
+      {/* 3. Mashina Tanlash Modali (O'yin ichida tezkor almashtirish) */}
+      {isCarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-[#090e1c] border border-cyan-500/40 rounded-2xl shadow-2xl p-4 sm:p-5 text-slate-100">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <span>🏎️</span> Poyga Mashinasini Tanlang
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCarModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <CarSelector
+              selectedCarId={carId}
+              onSelectCar={(newCarId) => {
+                if (onChangeCar) onChangeCar(newCarId);
+                try {
+                  localStorage.setItem('tg_user_car', newCarId);
+                } catch {
+                  // ignore
+                }
+                setIsCarModalOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 4. Ismni Tahrirlash Modali */}
+      {isNameModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-sm bg-[#090e1c] border border-cyan-500/40 rounded-2xl shadow-2xl p-4 text-slate-100">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <span>👤</span> Ismingizni Kiriting
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsNameModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveName} className="space-y-3">
+              <div>
+                <input
+                  type="text"
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  placeholder="Ismingizni kiriting..."
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-xl text-white text-xs outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNameModalOpen(false)}
+                  className="px-3 py-1.5 bg-slate-800 text-slate-300 text-xs rounded-xl cursor-pointer"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl cursor-pointer"
+                >
+                  Saqlash
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

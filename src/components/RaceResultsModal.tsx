@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { RotateCcw, Share2, Award, ArrowRight, Zap, Target, Clock, Activity, CheckCircle2, AlertTriangle, Hash, Trophy } from 'lucide-react';
 import { RaceStats, Participant } from '../types';
+import { sortRacersByRank } from '../utils/raceRanking';
 
 interface RaceResultsModalProps {
   stats: RaceStats;
@@ -10,6 +11,9 @@ interface RaceResultsModalProps {
   onNextQuote: () => void;
   onSaveScore: () => void;
   hasSaved: boolean;
+  isMultiplayer?: boolean;
+  isCreator?: boolean;
+  onNextRound?: () => void;
 }
 
 export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
@@ -18,7 +22,10 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
   onRestart,
   onNextQuote,
   onSaveScore,
-  hasSaved
+  hasSaved,
+  isMultiplayer = false,
+  isCreator = false,
+  onNextRound
 }) => {
   useEffect(() => {
     try {
@@ -33,12 +40,7 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
     }
   }, []);
 
-  const sortedRacers = [...participants].sort((a, b) => {
-    if (a.finished && b.finished) {
-      return (a.finishTimeSeconds || 999) - (b.finishTimeSeconds || 999);
-    }
-    return (b.currentWpm || 0) - (a.currentWpm || 0);
-  });
+  const sortedRacers = sortRacersByRank(participants);
 
   const userRank = stats.userRank || (sortedRacers.findIndex((p) => p.isUser) + 1);
   const totalRacers = stats.totalRacers || sortedRacers.length;
@@ -276,20 +278,47 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
           </button>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
-            <button
-              onClick={onRestart}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Qayta Urinish</span>
-            </button>
-            <button
-              onClick={onNextQuote}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 rounded-xl shadow-md shadow-cyan-500/20 transition-all"
-            >
-              <span>Keyingi Matn</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            {isMultiplayer ? (
+              isCreator ? (
+                <button
+                  onClick={onNextRound || onRestart}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 rounded-xl shadow-md shadow-emerald-500/20 transition-all cursor-pointer animate-pulse"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Keyingi Bosqichni Boshlash (Barcha uchun) 🏁</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 bg-cyan-950/70 border border-cyan-500/40 rounded-xl text-cyan-300 text-xs font-mono font-bold">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>Yaratuvchi keyingi bosqichni boshlashini kuting...</span>
+                </div>
+              )
+            ) : (
+              <>
+                <button
+                  onClick={onRestart}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Qayta Urinish</span>
+                </button>
+                <button
+                  onClick={onNextQuote}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 rounded-xl shadow-md shadow-cyan-500/20 transition-all"
+                >
+                  <span>Keyingi Matn</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+            {isMultiplayer && (
+              <button
+                onClick={onRestart}
+                className="px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl"
+              >
+                Yopish
+              </button>
+            )}
           </div>
         </div>
       </div>

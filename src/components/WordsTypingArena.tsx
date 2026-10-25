@@ -13,6 +13,7 @@ interface WordsTypingArenaProps {
   selectedDistance?: number;
   onDistanceChange?: (meters: number) => void;
   onRestart?: () => void;
+  startTimeMs?: number | null; // Sinxron poyga start vaqti (millisoniyalarda)
 }
 
 interface WordHistoryItem {
@@ -35,12 +36,13 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
   countdownActive = false,
   selectedDistance: externalDistance,
   onDistanceChange,
-  onRestart
+  onRestart,
+  startTimeMs = null
 }) => {
   const [distance, setDistance] = useState<number>(externalDistance || 100);
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
   const [currentInput, setCurrentInput] = useState<string>('');
-  const [startTime, setStartTime] = useState<number | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(startTimeMs || null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(true);
@@ -87,7 +89,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     }
     setCurrentWordIndex(0);
     setCurrentInput('');
-    setStartTime(null);
+    setStartTime(startTimeMs || null);
     setElapsedTime(0);
     setIsFinished(false);
     setTotalCorrectChars(0);
@@ -98,22 +100,32 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     setScrollX(0);
 
     setTimeout(() => {
-      if (!countdownActiveRef.current) {
+      const now = Date.now();
+      const isBeforeStart = startTimeMs ? now < startTimeMs : countdownActiveRef.current;
+      if (!isBeforeStart) {
         inputRef.current?.focus();
       }
     }, 50);
-  }, []);
+  }, [startTimeMs]);
 
   useEffect(() => {
     handleReset();
   }, [wordsList, handleReset]);
 
-  // 3-2-1 countdown tugaganda avtomatik fokus qilish
+  // startTimeMs va countdown kuzatuvi: vaqt kelishi bilan avtomatik fokus qilish
   useEffect(() => {
-    if (!countdownActive && isGameActive && !isFinished) {
+    if (startTimeMs && isGameActive && !isFinished) {
+      const checkFocus = setInterval(() => {
+        if (Date.now() >= startTimeMs) {
+          inputRef.current?.focus();
+          clearInterval(checkFocus);
+        }
+      }, 50);
+      return () => clearInterval(checkFocus);
+    } else if (!countdownActive && isGameActive && !isFinished) {
       inputRef.current?.focus();
     }
-  }, [countdownActive, isGameActive, isFinished]);
+  }, [startTimeMs, countdownActive, isGameActive, isFinished]);
 
   // Foydalanuvchi qo'lda tugma bosganda qayta boshlash
   const handleManualRestart = useCallback(() => {
@@ -142,7 +154,9 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
       timerRef.current = null;
     }
 
-    const duration = Math.max(0.5, finalDuration);
+    const duration = startTimeMs
+      ? Math.max(0.1, (Date.now() - startTimeMs) / 1000)
+      : Math.max(0.5, finalDuration);
     const minutes = duration / 60;
     const totalChars = finalCorrectChars + totalIncorrectChars;
 
@@ -172,20 +186,27 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
     onProgressUpdateRef.current(100, finalWpm, accuracy, totalChars, totalIncorrectChars, distance);
     onFinishRef.current(finalStats);
-  }, [totalIncorrectChars, distance, wpmHistory, totalKeystrokes]);
+  }, [startTimeMs, totalIncorrectChars, distance, wpmHistory, totalKeystrokes]);
 
   // Taymer hisobi: Sekundomer 0:00.0 dan yuqoriga qarab sanaydi
   useEffect(() => {
-    if (startTime && !isFinished && isGameActive && !countdownActive) {
+    const isLocked = (startTimeMs && Date.now() < startTimeMs) || countdownActive;
+    if (!isFinished && isGameActive && !isLocked) {
+      const activeStart = startTime || startTimeMs || Date.now();
+      if (!startTime) {
+        setStartTime(activeStart);
+      }
+
       timerRef.current = window.setInterval(() => {
         const now = Date.now();
-        const seconds = (now - startTime) / 1000;
+        const base = startTimeMs || activeStart;
+        const seconds = Math.max(0, (now - base) / 1000);
         setElapsedTime(seconds);
 
         const minutes = Math.max(0.01, seconds / 60);
         const liveWpm = Math.round((totalCorrectChars / 5) / minutes);
         setWpmHistory((prev) => [...prev, liveWpm].slice(-30));
-      }, 100);
+      }, 50);
     }
 
     return () => {
@@ -193,7 +214,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
         clearInterval(timerRef.current);
       }
     };
-  }, [startTime, isFinished, isGameActive, countdownActive, totalCorrectChars]);
+  }, [startTime, startTimeMs, isFinished, isGameActive, countdownActive, totalCorrectChars]);
 
   // Single-line Gorizontal silliq siljish (Aktiv so'zni ekran kengligiga mos chapdan ushlab turadi)
   useEffect(() => {
@@ -284,12 +305,16 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
   // Mobil klaviaturalarda Space / Bo'sh joyni ushlash (beforeinput - mobil brauzerlarda eng aniq usul)
   const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
-    if (isFinished || !isGameActive || countdownActive) return;
+    const isLocked = Boolean(countdownActive || (startTimeMs && Date.now() < startTimeMs));
+    if (isFinished || !isGameActive || isLocked) {
+      e.preventDefault();
+      return;
+    }
     const native = (e as any).nativeEvent as InputEvent;
     if (!native) return;
 
     if (!startTime) {
-      setStartTime(Date.now());
+      setStartTime(startTimeMs || Date.now());
     }
 
     // Mobil klaviatura "Bo'sh joy" (Spacebar) yoki Enter yuborganda
@@ -305,11 +330,15 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
   // Harf kiritilganda (Mobil telefonlar va kompyuter uchun to'liq optimallashgan)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isFinished || !isGameActive || countdownActive) return;
+    const isLocked = Boolean(countdownActive || (startTimeMs && Date.now() < startTimeMs));
+    if (isFinished || !isGameActive || isLocked) {
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
     const rawVal = e.target.value;
 
     if (!startTime && rawVal.length > 0) {
-      setStartTime(Date.now());
+      setStartTime(startTimeMs || Date.now());
     }
 
     // MOBIL QURILMALARDA PROBEL / BO'SH JOY BOSILGANDA (Gboard, Samsung, iOS):

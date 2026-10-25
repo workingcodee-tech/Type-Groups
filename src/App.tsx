@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Header } from './components/Header';
-import { Footer } from './components/Footer';
-import { HomeModeSelector } from './components/HomeModeSelector';
+import { RacingBackground } from './components/RacingBackground';
 import { SoloRaceArena } from './components/SoloRaceArena';
 import { MultiplayerRoom } from './components/MultiplayerRoom';
+import { ModeModal, ModeType } from './components/ModeModal';
 import { generate5000Words } from './data/words';
 import { SwitchSoundType, sounds } from './utils/soundEffects';
 import { DifficultyLevel } from './types';
@@ -14,20 +13,39 @@ export default function App() {
   // Tovush sozlamalari
   const [soundType, setSoundType] = useState<SwitchSoundType>('thock');
 
-  // Ilova holati: 'home' | 'solo' | 'room'
-  const [viewState, setViewState] = useState<'home' | 'solo' | 'room'>('home');
-  const [soloDifficulty, setSoloDifficulty] = useState<DifficultyLevel>('medium');
+  // Ilova holati: Foydalanuvchi talabiga ko'ra saytga kirgandan TO'G'RIDAN-TO'G'RI O'YIN BO'LIB OCHILADI ('solo')
+  const [viewState, setViewState] = useState<'solo' | 'room'>('solo');
+  const [soloDifficulty, setSoloDifficulty] = useState<DifficultyLevel>(() => {
+    try {
+      return (localStorage.getItem('tg_user_diff') as DifficultyLevel) || 'easy';
+    } catch {
+      return 'easy';
+    }
+  });
 
-  // Foydalanuvchi ma'lumotlari
+  // Foydalanuvchi ma'lumotlari (Avtomatik saqlangan yoki standart "Poygachi")
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     name: string;
     carId: string;
-  }>({
-    id: `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    name: '',
-    carId: 'bmw'
+  }>(() => {
+    let savedName = 'Poygachi';
+    let savedCar = 'bmw';
+    try {
+      savedName = localStorage.getItem('tg_user_name') || 'Poygachi';
+      savedCar = localStorage.getItem('tg_user_car') || 'bmw';
+    } catch {
+      // ignore
+    }
+    return {
+      id: `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: savedName,
+      carId: savedCar
+    };
   });
+
+  // Guruh multiplayer modali holati ('join' | 'create' | null)
+  const [multiplayerModalMode, setMultiplayerModalMode] = useState<ModeType | null>(null);
 
   // Faol xona ma'lumotlari
   const [activeRoom, setActiveRoom] = useState<{
@@ -50,8 +68,8 @@ export default function App() {
     }
   };
 
-  // 1-Bo'lim: Bir o'zim yozaman (Solo)
-  const handleStartSolo = (userName: string, carId: string, difficulty: DifficultyLevel = 'medium') => {
+  // Yakka poyga boshlash
+  const handleStartSolo = (userName: string, carId: string, difficulty: DifficultyLevel = 'easy') => {
     setCurrentUser((prev) => ({
       ...prev,
       name: userName,
@@ -59,9 +77,10 @@ export default function App() {
     }));
     setSoloDifficulty(difficulty);
     setViewState('solo');
+    setMultiplayerModalMode(null);
   };
 
-  // 2-Bo'lim: Guruhga qo'shilish (6 raqamli ID orqali)
+  // Guruhga qo'shilish (6 raqamli ID orqali)
   const handleJoinGroup = async (roomId: string, userName: string, carId: string) => {
     setLoadingAction('Xonaga ulanilmoqda...');
     setGlobalError(null);
@@ -114,6 +133,7 @@ export default function App() {
       });
 
       setViewState('room');
+      setMultiplayerModalMode(null);
     } catch (e: any) {
       console.error("Guruhga qo'shilishda xatolik:", e);
       setGlobalError('Guruhga qoʻshilishda xatolik yuz berdi. Iltimos, qayta urinib koʻring.');
@@ -122,15 +142,13 @@ export default function App() {
     }
   };
 
-  // 3-Bo'lim: Yangi guruh yaratish (vaqtinchalik 6 raqamlik ID)
+  // Yangi guruh yaratish (vaqtinchalik 6 raqamlik ID)
   const handleCreateGroup = async (groupName: string, userName: string, carId: string) => {
     setLoadingAction('Yangi xona va 6 raqamlik ID yaratilmoqda...');
     setGlobalError(null);
 
     try {
-      // 6 raqamli vaqtinchalik tasodifiy xona ID si (masalan: 749215)
       const random6DigitId = String(Math.floor(100000 + Math.random() * 900000));
-      // Xona uchun 5000 ta tasodifiy inglizcha so'zlar
       const roomWords = generate5000Words();
       const myId = currentUser.id;
 
@@ -142,10 +160,10 @@ export default function App() {
         creatorId: myId,
         creatorName: userName,
         status: 'waiting',
+        createdAt: new Date().toISOString(),
         words: roomWords,
-        maxMembers: 10,
-        targetDistance: 100,
-        createdAt: new Date().toISOString()
+        countdown: null,
+        targetDistance: 100
       });
 
       // Yaratuvchini ishtirokchi sifatida qo'shish
@@ -175,6 +193,7 @@ export default function App() {
       });
 
       setViewState('room');
+      setMultiplayerModalMode(null);
     } catch (e: any) {
       console.error("Guruh yaratishda xatolik:", e);
       setGlobalError('Guruh yaratishda xatolik yuz berdi. Iltimos, qayta urinib koʻring.');
@@ -185,109 +204,66 @@ export default function App() {
 
   const handleLeaveCurrentRoom = () => {
     setActiveRoom(null);
-    setViewState('home');
+    setViewState('solo');
   };
 
   return (
-    // Foydalanuvchi talabi: bu sayt emas balki o'yin bo'lsin, telefonlarda ham vertikal va ortiqcha ma'lumotsiz
-    <div className="h-screen h-[100dvh] max-h-screen max-h-[100dvh] overflow-hidden bg-[#050914] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Sarlavha: FAQAT bosh menyu ('home') bo'lgandagina chiqadi. O'yin vaqtida o'chiriladi */}
-      {viewState === 'home' && (
-        <Header
-          soundType={soundType}
-          onToggleSound={handleToggleSound}
-          activeRoomId={activeRoom?.id}
-          onLeaveRoom={handleLeaveCurrentRoom}
-          onGoHome={() => setViewState('home')}
-        />
-      )}
-
-      {/* Asosiy maydon */}
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center w-full max-w-6xl mx-auto px-2 sm:px-4 py-1">
+    // Foydalanuvchi talabi: sayt emas bu o'yin bo'lsin, tashrif buyurganda o'yin bo'lib ochilsin va orqa fon poygadek bo'lsin
+    <RacingBackground>
+      <div className="h-screen h-[100dvh] max-h-screen max-h-[100dvh] overflow-hidden flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200">
         {/* Yuklanmoqda bildirishnomasi */}
         {loadingAction && (
-          <div className="mb-2 p-2 bg-emerald-950/70 border border-emerald-500/60 rounded-xl text-emerald-300 text-xs text-center font-bold animate-pulse flex items-center justify-center gap-2 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <div className="m-2 p-2 bg-emerald-950/90 border border-emerald-500/70 rounded-xl text-emerald-300 text-xs text-center font-bold animate-pulse flex items-center justify-center gap-2 z-40 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>{loadingAction}</span>
           </div>
         )}
 
         {/* Global xatolik */}
         {globalError && (
-          <div className="mb-2 p-2 bg-rose-950/80 border border-rose-500/70 rounded-xl text-rose-300 text-xs text-center font-bold shrink-0">
+          <div className="m-2 p-2 bg-rose-950/90 border border-rose-500/80 rounded-xl text-rose-300 text-xs text-center font-bold z-40 shrink-0">
             {globalError}
           </div>
         )}
 
-        {/* BOSH SAHIFA: ARCADE O'YIN MENYUSI (Telefonlarda ham chiroyli vertikal) */}
-        {viewState === 'home' && (
-          <div className="space-y-3 sm:space-y-4 my-auto">
-            {/* O'yin sarlavhasi va rasmiy logotip */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#091823] via-[#08121d] to-[#040811] border-2 border-emerald-500/30 p-4 sm:p-5 shadow-2xl">
-              <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="space-y-1.5 text-center sm:text-left">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-[10px] text-emerald-400 font-extrabold uppercase font-mono tracking-widest">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>ONLINE TYPING RACING GAME · WORKING CODE</span>
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tighter drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">
-                    TYPE <span className="text-emerald-400">GROUPS</span>
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-300 max-w-lg leading-relaxed">
-                    Haqiqiy avtomobillar bilan jonli trassada poyga qiling va klaviatura tezligingizni oshiring.
-                  </p>
-                </div>
-
-                {/* Rasmiy logotip */}
-                <div className="shrink-0 flex flex-col items-center">
-                  <img
-                    src="/type-groups-logo.png"
-                    alt="Type Groups Rasmiy Logotipi"
-                    className="w-20 h-20 sm:w-24 sm:h-24 object-contain rounded-full transition-transform hover:scale-105 duration-300 filter drop-shadow-[0_0_15px_rgba(0,229,255,0.4)]"
-                    width={96}
-                    height={96}
-                  />
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold mt-1 tracking-wider">
-                    WORKING CODE
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3 ta bo'lim tanlovi */}
-            <HomeModeSelector
-              onStartSolo={handleStartSolo}
-              onJoinGroup={handleJoinGroup}
-              onCreateGroup={handleCreateGroup}
+        {/* Asosiy O'yin Maydoni */}
+        <main className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center w-full max-w-6xl mx-auto px-2 sm:px-4 py-1">
+          {viewState === 'solo' && (
+            <SoloRaceArena
+              userName={currentUser.name}
+              carId={currentUser.carId}
+              initialDifficulty={soloDifficulty}
+              onOpenMultiplayer={() => setMultiplayerModalMode('join')}
+              onChangeCar={(newCarId) => setCurrentUser(prev => ({ ...prev, carId: newCarId }))}
+              onChangeName={(newName) => setCurrentUser(prev => ({ ...prev, name: newName }))}
+              soundType={soundType}
+              onToggleSound={handleToggleSound}
             />
-          </div>
-        )}
+          )}
 
-        {/* 1-Bo'lim: Yakka poyga (Xuddi rasmdagidek sof o'yin ko'rinishida) */}
-        {viewState === 'solo' && (
-          <SoloRaceArena
-            userName={currentUser.name}
-            carId={currentUser.carId}
-            initialDifficulty={soloDifficulty}
-            onBack={() => setViewState('home')}
+          {viewState === 'room' && activeRoom && (
+            <MultiplayerRoom
+              roomId={activeRoom.id}
+              myId={currentUser.id}
+              myName={currentUser.name}
+              myCarId={currentUser.carId}
+              isCreator={activeRoom.isCreator}
+              onLeave={handleLeaveCurrentRoom}
+            />
+          )}
+        </main>
+
+        {/* Guruhga qo'shilish / yaratish modali */}
+        {multiplayerModalMode && (
+          <ModeModal
+            mode={multiplayerModalMode}
+            onClose={() => setMultiplayerModalMode(null)}
+            onStartSolo={handleStartSolo}
+            onJoinGroup={handleJoinGroup}
+            onCreateGroup={handleCreateGroup}
           />
         )}
-
-        {/* 2 & 3-Bo'lim: Guruhli multiplayer poyga (Sof o'yin ko'rinishida) */}
-        {viewState === 'room' && activeRoom && (
-          <MultiplayerRoom
-            roomId={activeRoom.id}
-            myId={currentUser.id}
-            myName={currentUser.name}
-            myCarId={currentUser.carId}
-            isCreator={activeRoom.isCreator}
-            onLeave={handleLeaveCurrentRoom}
-          />
-        )}
-      </main>
-
-      {/* Futer: FAQAT bosh menyu ('home') da ko'rinadi */}
-      {viewState === 'home' && <Footer />}
-    </div>
+      </div>
+    </RacingBackground>
   );
 }

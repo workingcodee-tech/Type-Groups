@@ -115,12 +115,13 @@ const BASE_ENGLISH_WORDS = [
 ];
 
 /**
- * 5000 ta tasodifiy so'zlar ro'yxatini hosil qiladi
+ * 5000 ta (yoki belgilangan miqdorda) tasodifiy so'zlar ro'yxatini hosil qiladi
  */
-export function generate5000Words(): string[] {
+export function generate5000Words(count: number = 5000): string[] {
   const result: string[] = [];
   const len = BASE_ENGLISH_WORDS.length;
-  for (let i = 0; i < 5000; i++) {
+  const targetCount = Math.max(1, count);
+  for (let i = 0; i < targetCount; i++) {
     const randomIndex = Math.floor(Math.random() * len);
     result.push(BASE_ENGLISH_WORDS[randomIndex]);
   }

@@ -10,6 +10,9 @@ export interface HighwayRacer {
   accuracy: number;
   finished: boolean;
   finishTime?: number;
+  finishTimeSeconds?: number;
+  finishedAt?: number;
+  finishRank?: number;
   isUser: boolean;
   rank?: number;
 }

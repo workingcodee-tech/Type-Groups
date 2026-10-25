@@ -4,9 +4,12 @@ import { db } from '../firebase';
 import { HighwayRaceTrack, HighwayRacer } from './HighwayRaceTrack';
 import { WordsTypingArena } from './WordsTypingArena';
 import { RaceResultsModal } from './RaceResultsModal';
+import { FinishCelebrationOverlay } from './FinishCelebrationOverlay';
 import { RaceStats } from '../types';
-import { Play, LogOut, Copy, Check, Users, Trash2, AlertCircle } from 'lucide-react';
+import { Play, LogOut, Copy, Check, Users, Trash2, AlertCircle, RotateCcw } from 'lucide-react';
 import { sounds } from '../utils/soundEffects';
+import { sortRacersByRank } from '../utils/raceRanking';
+import { generate5000Words } from '../data/words';
 
 interface MultiplayerRoomProps {
   roomId: string;
@@ -28,10 +31,16 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [raceStats, setRaceStats] = useState<RaceStats | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [showDetailedModal, setShowDetailedModal] = useState(false);
   const [roomClosed, setRoomClosed] = useState(false);
+  const [isResettingRound, setIsResettingRound] = useState(false);
 
   const lastUpdateRef = useRef<number>(0);
+  const playedCountdownRef = useRef<number | null>(null);
+  const lastRoundRef = useRef<number>(1);
 
+  // 1. Xona holatini kuzatish
   useEffect(() => {
     const roomRef = doc(db, 'rooms', roomId);
     const unsubRoom = onSnapshot(roomRef, (snapshot) => {
@@ -42,18 +51,19 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       const data = snapshot.data();
       setRoomData(data);
 
-      if (data.status === 'starting' && data.countdown !== undefined) {
-        setCountdown(data.countdown);
-        if (data.countdown >= 0) {
-          sounds.playCountdown(data.countdown);
-        }
-      } else if (data.status === 'racing') {
-        setCountdown(null);
+      // Agar yangi bosqich boshlangan bo'lsa (round o'zgardi):
+      if (data.round && data.round !== lastRoundRef.current) {
+        lastRoundRef.current = data.round;
+        // Barcha o'yinchilar uchun modallarni avtomatik yopish
+        setShowCelebration(false);
+        setShowDetailedModal(false);
+        setRaceStats(null);
       }
     }, (error) => {
       console.warn("Xonani kuzatishda xatolik:", error);
     });
 
+    // 2. Ishtirokchilarni kuzatish va o'rinlarni aniq hisoblash
     const participantsRef = collection(db, 'rooms', roomId, 'participants');
     const unsubParticipants = onSnapshot(participantsRef, (snapshot) => {
       const list: HighwayRacer[] = [];
@@ -67,24 +77,24 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
           currentWpm: p.currentWpm || 0,
           accuracy: p.accuracy || 100,
           finished: !!p.finished,
-          finishTime: p.finishTime,
+          finishTime: p.finishTime ?? p.finishTimeSeconds,
+          finishTimeSeconds: p.finishTimeSeconds ?? p.finishTime,
+          finishedAt: p.finishedAt,
+          finishRank: p.finishRank,
           isUser: p.id === myId,
           joinedAt: p.joinedAt || p.id
         } as any);
       });
 
-      const sortedBySpeed = [...list].sort((a, b) => {
-        if (a.finished && b.finished) {
-          return (a.finishTime || 999) - (b.finishTime || 999);
-        }
-        return (b.progress - a.progress) || (b.currentWpm - a.currentWpm);
-      });
+      // Aniq va adolatli saralash: Marraga yetganlar vaqt bo'yicha, yetmaganlar progress bo'yicha
+      const sortedByRank = sortRacersByRank(list);
 
       const rankMap = new Map();
-      sortedBySpeed.forEach((r, idx) => {
+      sortedByRank.forEach((r, idx) => {
         rankMap.set(r.id, idx + 1);
       });
 
+      // Trassada yo'laklar tartibi doimiy qoladi, lekin har bir mashinaga to'g'ri o'rin (rank) yoziladi
       const stableList = [...list].sort((a: any, b: any) => (a.joinedAt || a.id).localeCompare(b.joinedAt || b.id));
       const withRank = stableList.map((r) => ({
         ...r,
@@ -92,6 +102,22 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       }));
 
       setParticipants(withRank);
+
+      // Agar foydalanuvchi allaqachon marraga yetgan bo'lsa, uning yakuniy o'rnini sinxronlashtirish
+      const myRacer = withRank.find(p => p.isUser);
+      if (myRacer?.finished && myRacer.rank) {
+        setRaceStats((prev) => {
+          if (!prev) return null;
+          if (prev.userRank !== myRacer.rank) {
+            return {
+              ...prev,
+              userRank: myRacer.rank,
+              totalRacers: withRank.length
+            };
+          }
+          return prev;
+        });
+      }
     }, (error) => {
       console.warn("Ishtirokchilarni olishda xatolik:", error);
     });
@@ -102,9 +128,62 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     };
   }, [roomId, myId]);
 
+  // 3. Millisekundlik aniq sinxron 3-2-1 hisoblagich (Barcha guruh a'zolarida bir paytda ishlaydi)
+  useEffect(() => {
+    const startTimeMs = roomData?.startTimeMs;
+    if (!startTimeMs) {
+      setCountdown(null);
+      playedCountdownRef.current = null;
+      return;
+    }
+
+    const syncInterval = window.setInterval(() => {
+      const now = Date.now();
+      const diffMs = startTimeMs - now;
+
+      if (diffMs > 3000) {
+        setCountdown(3);
+        if (playedCountdownRef.current !== 3) {
+          playedCountdownRef.current = 3;
+          sounds.playCountdown(3);
+        }
+      } else if (diffMs > 2000) {
+        setCountdown(3);
+        if (playedCountdownRef.current !== 3) {
+          playedCountdownRef.current = 3;
+          sounds.playCountdown(3);
+        }
+      } else if (diffMs > 1000) {
+        setCountdown(2);
+        if (playedCountdownRef.current !== 2) {
+          playedCountdownRef.current = 2;
+          sounds.playCountdown(2);
+        }
+      } else if (diffMs > 0) {
+        setCountdown(1);
+        if (playedCountdownRef.current !== 1) {
+          playedCountdownRef.current = 1;
+          sounds.playCountdown(1);
+        }
+      } else if (diffMs > -1200) {
+        // Start signali: 0 -> GO!
+        setCountdown(0);
+        if (playedCountdownRef.current !== 0) {
+          playedCountdownRef.current = 0;
+          sounds.playCountdown(0);
+        }
+      } else {
+        setCountdown(null);
+      }
+    }, 30);
+
+    return () => clearInterval(syncInterval);
+  }, [roomData?.startTimeMs]);
+
+  // Foydalanuvchi yozayotgan paytda progressni bazaga yuborish
   const handleProgressUpdate = React.useCallback(async (progress: number, wpm: number, accuracy: number, totalChars: number, errors: number) => {
     const now = Date.now();
-    if (progress < 100 && now - lastUpdateRef.current < 250) {
+    if (progress < 100 && now - lastUpdateRef.current < 200) {
       return;
     }
     lastUpdateRef.current = now;
@@ -125,23 +204,25 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     }
   }, [roomId, myId]);
 
+  // Marraga yetib kelganda: Aniq o'rinni hisoblash va natijalarni saqlash
   const handleFinish = React.useCallback(async (stats: RaceStats) => {
-    setParticipants((currentParticipants) => {
-      const sorted = [...currentParticipants].sort((a, b) => (b.currentWpm || 0) - (a.currentWpm || 0));
-      const userRank = sorted.findIndex((p) => p.isUser) + 1;
+    const finishTimestamp = Date.now();
+    const finishTimeSeconds = Number(stats.timeSeconds.toFixed(1));
 
-      setRaceStats({
-        ...stats,
-        userRank: userRank || 1,
-        totalRacers: currentParticipants.length
-      });
-      return currentParticipants;
+    // Mendan oldin marraga yetganlar soni
+    const alreadyFinishedRacers = participants.filter(p => !p.isUser && p.finished);
+    const myRealRank = alreadyFinishedRacers.length + 1;
+
+    setRaceStats({
+      ...stats,
+      userRank: myRealRank,
+      totalRacers: participants.length
     });
+    setShowCelebration(true);
+    setShowDetailedModal(false);
 
     try {
       const myRef = doc(db, 'rooms', roomId, 'participants', myId);
-      const targetMeters = roomData?.targetDistance || 100;
-      const targetChars = targetMeters === 1000 ? 850 : targetMeters === 500 ? 450 : 100;
       await updateDoc(myRef, {
         progress: 100,
         currentWpm: stats.wpm,
@@ -149,38 +230,80 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
         totalChars: stats.totalChars,
         errors: stats.incorrectChars,
         finished: true,
-        finishTime: stats.timeSeconds,
+        finishTime: finishTimeSeconds,
+        finishTimeSeconds: finishTimeSeconds,
+        finishedAt: finishTimestamp,
+        finishRank: myRealRank,
         updatedAt: new Date().toISOString()
       });
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn("Marrani saqlashda xatolik:", e);
     }
-  }, [roomId, myId, roomData?.targetDistance]);
+  }, [roomId, myId, participants]);
 
+  // 1-bosqich: Birinchi poygani boshlash (Faqat xona yaratuvchisi boshlaydi)
   const handleStartRace = async () => {
     if (!isCreator) return;
     try {
       const roomRef = doc(db, 'rooms', roomId);
+      // Barcha a'zolarga yetib borishi va aniq bir xil millisekundda start olishi uchun 4.2 soniya oldinga belgilanadi
+      const startMs = Date.now() + 4200;
       await updateDoc(roomRef, {
         status: 'starting',
-        countdown: 3
+        startTimeMs: startMs,
+        startedAt: new Date().toISOString()
       });
-
-      let count = 3;
-      const interval = setInterval(async () => {
-        count -= 1;
-        if (count >= 0) {
-          await updateDoc(roomRef, { countdown: count });
-        } else {
-          clearInterval(interval);
-          await updateDoc(roomRef, {
-            status: 'racing',
-            countdown: null
-          });
-        }
-      }, 1000);
     } catch (e) {
       console.warn("Poygani boshlashda xatolik:", e);
+    }
+  };
+
+  // 2-bosqich: KEYINGI BOSQICH / YANGI O'YIN (Faqat xona yaratuvchisi bosadi va barcha guruh a'zolari bir vaqtda boshlaydi)
+  const handleNextRound = async () => {
+    if (!isCreator || isResettingRound) return;
+    setIsResettingRound(true);
+
+    try {
+      const targetMeters = roomData?.targetDistance || 100;
+      const targetWordsCount = targetMeters === 1000 ? 170 : targetMeters === 500 ? 90 : 35;
+      const newWords = generate5000Words(targetWordsCount);
+      const nextRoundNumber = (roomData?.round || 1) + 1;
+      const nextStartMs = Date.now() + 4200;
+
+      // Barcha ishtirokchilarning natijalarini tozalash (reset qilish)
+      const participantsRef = collection(db, 'rooms', roomId, 'participants');
+      const snap = await getDocs(participantsRef);
+      const resetPromises = snap.docs.map((docSnap) =>
+        updateDoc(docSnap.ref, {
+          progress: 0,
+          currentWpm: 0,
+          accuracy: 100,
+          totalChars: 0,
+          errors: 0,
+          finished: false,
+          finishTime: null,
+          finishTimeSeconds: null,
+          finishedAt: null,
+          finishRank: null,
+          updatedAt: new Date().toISOString()
+        })
+      );
+      await Promise.all(resetPromises);
+
+      // Xonaga yangi so'zlarni yuklash va sinxron start vaqtini o'rnatish
+      const roomRef = doc(db, 'rooms', roomId);
+      await updateDoc(roomRef, {
+        words: newWords,
+        round: nextRoundNumber,
+        status: 'starting',
+        startTimeMs: nextStartMs,
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn("Keyingi bosqichga o'tishda xatolik:", e);
+    } finally {
+      setIsResettingRound(false);
     }
   };
 
@@ -228,8 +351,12 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     );
   }
 
-  const isRacing = roomData?.status === 'racing';
+  // Poyga faolmi (startTimeMs bor va o'yin boshlangan yoki countdown ketmoqda)
+  const isGameUnderway = roomData?.status === 'starting' || roomData?.status === 'racing';
   const wordsList = roomData?.words || [];
+
+  // Barcha yoki g'olib marraga yetganini tekshirish
+  const hasAnyoneFinished = participants.some(p => p.finished);
 
   return (
     <div className="w-full h-full max-w-5xl mx-auto flex flex-col justify-between py-1 px-2 select-none">
@@ -254,10 +381,16 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             <Users className="w-3 h-3 text-cyan-400" />
             <span>{participants.length}/10</span>
           </div>
+          {roomData?.round && roomData.round > 1 && (
+            <div className="px-2 py-0.5 bg-cyan-950 border border-cyan-500/50 rounded-md text-[11px] font-mono font-bold text-cyan-300">
+              {roomData.round}-bosqich
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          {isCreator && roomData?.status !== 'racing' && (
+          {/* Yaratuvchi uchun: Birinchi poygani boshlash */}
+          {isCreator && !isGameUnderway && (
             <button
               onClick={handleStartRace}
               className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-extrabold text-xs rounded-lg shadow-md cursor-pointer animate-pulse"
@@ -267,6 +400,19 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             </button>
           )}
 
+          {/* Yaratuvchi uchun: Poyga tugaganda keyingi bosqichni boshlash */}
+          {isCreator && isGameUnderway && hasAnyoneFinished && (
+            <button
+              onClick={handleNextRound}
+              disabled={isResettingRound}
+              className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs rounded-lg shadow-md cursor-pointer animate-bounce"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{isResettingRound ? 'Yuklanmoqda...' : 'KEYINGI BOSQICH 🏁'}</span>
+            </button>
+          )}
+
+          {/* Guruhdan chiqish yoki xonani yakunlash */}
           {isCreator ? (
             <button
               onClick={handleDeleteRoom}
@@ -295,10 +441,10 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
           roomId={roomId}
         />
 
-        {/* 3... 2... 1... START! Overlay */}
+        {/* 3... 2... 1... START! Overlay (Millisekund aniqlikda sinxron) */}
         {countdown !== null && (
-          <div className="absolute inset-0 bg-black/65 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center animate-fade-in pointer-events-none">
-            {/* Chiroqlar (Traffic Light) */}
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center animate-fade-in pointer-events-none">
+            {/* Chiroqlar (Svetofor) */}
             <div className="flex items-center gap-3 mb-2 p-2 bg-slate-950/90 border border-slate-800 rounded-full shadow-2xl">
               <span className={`w-5 h-5 rounded-full transition-all duration-200 ${
                 countdown === 3 ? 'bg-rose-500 shadow-[0_0_15px_#f43f5e] scale-125' : 'bg-rose-950/40 border border-rose-900/60'
@@ -323,7 +469,7 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             </div>
 
             <p className="text-[11px] sm:text-xs font-mono font-bold text-slate-300 mt-2 tracking-widest uppercase bg-slate-900/90 px-3 py-0.5 rounded-md border border-slate-700">
-              {countdown === 0 ? 'POYGA BOSHLANDI!' : 'BARCHA OʻYINCHILAR TAYYORLANSIN...'}
+              {countdown === 0 ? 'POYGA BOSHLANDI!' : 'BARCHA OʻYINCHILAR BIR VAQTDA TAYYORLANSIN...'}
             </p>
           </div>
         )}
@@ -331,13 +477,14 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
 
       {/* 3. Spidometr va Bir Qatorlik Yozish Konsoli */}
       <div className="pt-1">
-        {isRacing ? (
+        {isGameUnderway ? (
           <WordsTypingArena
             wordsList={wordsList}
             onProgressUpdate={handleProgressUpdate}
             onFinish={handleFinish}
             isGameActive={true}
-            countdownActive={countdown !== null}
+            countdownActive={countdown !== null && countdown > 0}
+            startTimeMs={roomData?.startTimeMs || null}
             selectedDistance={roomData?.targetDistance || 100}
           />
         ) : (
@@ -345,14 +492,46 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             <span className="text-xs sm:text-sm font-bold text-white font-mono">
               {isCreator
                 ? '🎮 Oʻyinchilar qoʻshilishini kuting va yuqoridagi "START RACE" tugmasini bosing'
-                : '⏳ Xona yaratuvchisi poygani boshlashini kuting...'}
+                : '⏳ Xona yaratuvchisi poygani boshlashini kuting... (Faqat yaratuvchi boshqaradi)'}
             </span>
           </div>
         )}
       </div>
 
-      {/* Natijalar modali */}
-      {raceStats && (
+      {/* 4. G'alaba Animatsiyasi (FinishCelebrationOverlay) */}
+      {raceStats && showCelebration && (
+        <FinishCelebrationOverlay
+          stats={raceStats}
+          participants={participants.map(p => ({
+            id: p.id,
+            name: p.name,
+            avatar: '🏎️',
+            isUser: p.isUser,
+            progress: p.progress,
+            currentWpm: p.currentWpm,
+            rawWpm: p.currentWpm,
+            accuracy: p.accuracy,
+            finished: p.finished,
+            finishTimeSeconds: p.finishTimeSeconds ?? p.finishTime,
+            rank: p.rank,
+            color: '#00E5FF'
+          }))}
+          isMultiplayer={true}
+          isCreator={isCreator}
+          onNextRound={handleNextRound}
+          onRestart={() => {
+            setShowCelebration(false);
+            setShowDetailedModal(false);
+          }}
+          onOpenDetailedStats={() => {
+            setShowCelebration(false);
+            setShowDetailedModal(true);
+          }}
+        />
+      )}
+
+      {/* 5. Batafsil Natijalar Modali */}
+      {raceStats && showDetailedModal && (
         <RaceResultsModal
           stats={raceStats}
           participants={participants.map(p => ({
@@ -365,12 +544,18 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
             rawWpm: p.currentWpm,
             accuracy: p.accuracy,
             finished: p.finished,
-            finishTimeSeconds: p.finishTime,
+            finishTimeSeconds: p.finishTimeSeconds ?? p.finishTime,
             rank: p.rank,
             color: '#00E5FF'
           }))}
-          onRestart={() => setRaceStats(null)}
-          onNextQuote={() => setRaceStats(null)}
+          isMultiplayer={true}
+          isCreator={isCreator}
+          onNextRound={handleNextRound}
+          onRestart={() => {
+            setShowCelebration(false);
+            setShowDetailedModal(false);
+          }}
+          onNextQuote={handleNextRound}
           onSaveScore={() => {}}
           hasSaved={true}
         />
