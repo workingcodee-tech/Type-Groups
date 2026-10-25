@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RacingBackground } from './components/RacingBackground';
+import { HomeModeSelector } from './components/HomeModeSelector';
 import { SoloRaceArena } from './components/SoloRaceArena';
 import { MultiplayerRoom } from './components/MultiplayerRoom';
 import { ModeModal, ModeType } from './components/ModeModal';
@@ -13,13 +14,17 @@ export default function App() {
   // Tovush sozlamalari
   const [soundType, setSoundType] = useState<SwitchSoundType>('thock');
 
-  // Ilova holati: Foydalanuvchi talabiga ko'ra saytga kirgandan TO'G'RIDAN-TO'G'RI O'YIN BO'LIB OCHILADI ('solo')
-  const [viewState, setViewState] = useState<'solo' | 'room'>('solo');
+  // Ilova holati: Foydalanuvchi kirganda avval REJIM TANLASH EKRANI ('home') ochiladi:
+  // 1. O'zim yozishim (Yakkaxon mashq)
+  // 2. Guruh yaratishim (Yangi xona ochish)
+  // 3. Guruhga qo'shilishim (Kod orqali ulanish)
+  const [viewState, setViewState] = useState<'home' | 'solo' | 'room'>('home');
+
   const [soloDifficulty, setSoloDifficulty] = useState<DifficultyLevel>(() => {
     try {
-      return (localStorage.getItem('tg_user_diff') as DifficultyLevel) || 'easy';
+      return (localStorage.getItem('tg_user_diff') as DifficultyLevel) || 'medium';
     } catch {
-      return 'easy';
+      return 'medium';
     }
   });
 
@@ -43,6 +48,21 @@ export default function App() {
       carId: savedCar
     };
   });
+
+  // URL orqali kelgan xona kodi (?room=123456)
+  const [initialRoomParam, setInitialRoomParam] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const room = params.get('room');
+      if (room && /^\d{6}$/.test(room)) {
+        setInitialRoomParam(room);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Guruh multiplayer modali holati ('join' | 'create' | null)
   const [multiplayerModalMode, setMultiplayerModalMode] = useState<ModeType | null>(null);
@@ -69,13 +89,20 @@ export default function App() {
   };
 
   // Yakka poyga boshlash
-  const handleStartSolo = (userName: string, carId: string, difficulty: DifficultyLevel = 'easy') => {
+  const handleStartSolo = (userName: string, carId: string, difficulty: DifficultyLevel = 'medium') => {
     setCurrentUser((prev) => ({
       ...prev,
       name: userName,
       carId
     }));
     setSoloDifficulty(difficulty);
+    try {
+      localStorage.setItem('tg_user_name', userName);
+      localStorage.setItem('tg_user_car', carId);
+      localStorage.setItem('tg_user_diff', difficulty);
+    } catch {
+      // ignore
+    }
     setViewState('solo');
     setMultiplayerModalMode(null);
   };
@@ -90,7 +117,7 @@ export default function App() {
       const roomSnap = await getDoc(roomRef);
 
       if (!roomSnap.exists()) {
-        setGlobalError(`"${roomId}" raqamli xona topilmadi. ID toʻgʻri kiritilganini tekshiring.`);
+        setGlobalError(`"${roomId}" raqamli xona topilmadi. 6 raqamli ID toʻgʻri kiritilganini tekshiring.`);
         setLoadingAction(null);
         return;
       }
@@ -126,6 +153,13 @@ export default function App() {
         name: userName,
         carId
       }));
+
+      try {
+        localStorage.setItem('tg_user_name', userName);
+        localStorage.setItem('tg_user_car', carId);
+      } catch {
+        // ignore
+      }
 
       setActiveRoom({
         id: roomId,
@@ -163,7 +197,8 @@ export default function App() {
         createdAt: new Date().toISOString(),
         words: roomWords,
         countdown: null,
-        targetDistance: 100
+        targetDistance: 100,
+        round: 1
       });
 
       // Yaratuvchini ishtirokchi sifatida qo'shish
@@ -187,6 +222,13 @@ export default function App() {
         carId
       }));
 
+      try {
+        localStorage.setItem('tg_user_name', userName);
+        localStorage.setItem('tg_user_car', carId);
+      } catch {
+        // ignore
+      }
+
       setActiveRoom({
         id: random6DigitId,
         isCreator: true
@@ -204,11 +246,10 @@ export default function App() {
 
   const handleLeaveCurrentRoom = () => {
     setActiveRoom(null);
-    setViewState('solo');
+    setViewState('home');
   };
 
   return (
-    // Foydalanuvchi talabi: sayt emas bu o'yin bo'lsin, tashrif buyurganda o'yin bo'lib ochilsin va orqa fon poygadek bo'lsin
     <RacingBackground>
       <div className="h-screen h-[100dvh] max-h-screen max-h-[100dvh] overflow-hidden flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200">
         {/* Yuklanmoqda bildirishnomasi */}
@@ -227,12 +268,30 @@ export default function App() {
         )}
 
         {/* Asosiy O'yin Maydoni */}
-        <main className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center w-full max-w-6xl mx-auto px-2 sm:px-4 py-1">
+        <main className="flex-1 min-h-0 overflow-y-auto sm:overflow-hidden flex flex-col justify-center w-full max-w-6xl mx-auto px-2 sm:px-4 py-1">
+          {/* 1. BOSH REJIM TANLASH LOBBISI (Saytga kirganda so'raladi) */}
+          {viewState === 'home' && (
+            <HomeModeSelector
+              currentUser={currentUser}
+              onUpdateUser={(updatedName, updatedCar) => {
+                setCurrentUser(prev => ({ ...prev, name: updatedName, carId: updatedCar }));
+              }}
+              onStartSolo={handleStartSolo}
+              onJoinGroup={handleJoinGroup}
+              onCreateGroup={handleCreateGroup}
+              soundType={soundType}
+              onToggleSound={handleToggleSound}
+              initialRoomId={initialRoomParam}
+            />
+          )}
+
+          {/* 2. YAKKAXON POYGA (Solo Race) */}
           {viewState === 'solo' && (
             <SoloRaceArena
               userName={currentUser.name}
               carId={currentUser.carId}
               initialDifficulty={soloDifficulty}
+              onBack={() => setViewState('home')}
               onOpenMultiplayer={() => setMultiplayerModalMode('join')}
               onChangeCar={(newCarId) => setCurrentUser(prev => ({ ...prev, carId: newCarId }))}
               onChangeName={(newName) => setCurrentUser(prev => ({ ...prev, name: newName }))}
@@ -241,6 +300,7 @@ export default function App() {
             />
           )}
 
+          {/* 3. GURUH MULTIPLAYER XONASI */}
           {viewState === 'room' && activeRoom && (
             <MultiplayerRoom
               roomId={activeRoom.id}
@@ -253,7 +313,7 @@ export default function App() {
           )}
         </main>
 
-        {/* Guruhga qo'shilish / yaratish modali */}
+        {/* Guruhga qo'shilish / yaratish qo'shimcha modali */}
         {multiplayerModalMode && (
           <ModeModal
             mode={multiplayerModalMode}

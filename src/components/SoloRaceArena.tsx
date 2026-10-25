@@ -310,6 +310,19 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
             </span>
           </div>
 
+          {/* Bosh sahifa / Rejimlar tanlovi */}
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
+              title="Bosh menyuga qaytish va rejim tanlash"
+            >
+              <span>🏠</span>
+              <span>Rejimlar</span>
+            </button>
+          )}
+
           {/* Guruhga o'tish (Multiplayer) tugmasi */}
           {onOpenMultiplayer && (
             <button
