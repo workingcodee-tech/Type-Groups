@@ -49,7 +49,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
   const [distance, setDistance] = useState<number>(externalDistance || 100);
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
   const [currentInput, setCurrentInput] = useState<string>('');
-  const [startTime, setStartTime] = useState<number | null>(startTimeMs || null);
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(true);
@@ -151,8 +151,8 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
       timerRef.current = null;
     }
 
-    const duration = startTimeMs
-      ? Math.max(0.1, (Date.now() - startTimeMs) / 1000)
+    const duration = startTime
+      ? Math.max(0.1, (Date.now() - startTime) / 1000)
       : Math.max(0.5, finalDuration);
     const minutes = duration / 60;
     const totalChars = finalCorrectChars + totalIncorrectChars;
@@ -183,7 +183,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
     onProgressUpdateRef.current(100, finalWpm, accuracy, totalChars, totalIncorrectChars, distance);
     onFinishRef.current(finalStats);
-  }, [startTimeMs, totalIncorrectChars, distance, wpmHistory, totalKeystrokes]);
+  }, [startTime, totalIncorrectChars, distance, wpmHistory, totalKeystrokes]);
 
   // Taymer hisobi: Sekundomer 0:00.0 dan yuqoriga qarab sanaydi
   useEffect(() => {
@@ -300,8 +300,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
   // Mobil klaviaturalarda Space / Bo'sh joyni ushlash (beforeinput - mobil brauzerlarda eng aniq usul)
   const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
-    const isLocked = Boolean(countdownActive || (startTimeMs && Date.now() < startTimeMs));
-    if (isFinished || !isGameActive || isLocked) {
+    if (isFinished || !isGameActive || countdownActive) {
       e.preventDefault();
       return;
     }
@@ -309,7 +308,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
     if (!native) return;
 
     if (!startTime) {
-      setStartTime(startTimeMs || Date.now());
+      setStartTime(Date.now());
     }
 
     // Mobil klaviatura "Bo'sh joy" (Spacebar) yoki Enter yuborganda
@@ -325,15 +324,14 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
 
   // Harf kiritilganda (Mobil telefonlar va kompyuter uchun to'liq optimallashgan)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const isLocked = Boolean(countdownActive || (startTimeMs && Date.now() < startTimeMs));
-    if (isFinished || !isGameActive || isLocked) {
+    if (isFinished || !isGameActive || countdownActive) {
       if (inputRef.current) inputRef.current.value = '';
       return;
     }
     const rawVal = e.target.value;
 
     if (!startTime && rawVal.length > 0) {
-      setStartTime(startTimeMs || Date.now());
+      setStartTime(Date.now());
     }
 
     // MOBIL QURILMALARDA PROBEL / BO'SH JOY BOSILGANDA (Gboard, Samsung, iOS):
@@ -536,12 +534,7 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
         <div
           ref={wordsContainerRef}
           onClick={() => {
-            if (!countdownActive && !isFinished) {
-              inputRef.current?.focus();
-            }
-          }}
-          onTouchEnd={() => {
-            if (!countdownActive && !isFinished) {
+            if (!isFinished) {
               inputRef.current?.focus();
             }
           }}
@@ -558,27 +551,39 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            disabled={countdownActive || isFinished}
-            className="absolute inset-0 w-full h-full opacity-[0.01] z-20 cursor-text bg-transparent border-0 outline-none p-0 m-0 text-transparent caret-transparent"
-            style={{ fontSize: '16px' }}
+            readOnly={isFinished}
+            className="absolute inset-0 w-full h-full z-20 cursor-text bg-transparent border-0 outline-none p-0 m-0 text-transparent caret-transparent select-none opacity-100"
+            style={{ fontSize: '16px', WebkitTapHighlightColor: 'transparent' }}
             autoFocus={!countdownActive}
             autoCapitalize="none"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
             inputMode="text"
+            enterKeyHint="next"
             aria-label="So'zlarni kiritish maydoni"
           />
 
-          {/* Fokus yo'qolganda ko'rsatma (pointer-events-none bo'lgani tufayli har qanday teginish to'g'ridan to'g'ri inputga o'tadi) */}
+          {/* Fokus yo'qolganda ko'rsatma va mobil uchun to'g'ridan to'g'ri klaviatura ochish tugmasi */}
           {!isFocused && !isFinished && !countdownActive && (
-            <div
-              className="absolute inset-0 bg-[#0c121d]/85 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                inputRef.current?.focus();
+                setIsFocused(true);
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                inputRef.current?.focus();
+                setIsFocused(true);
+              }}
+              className="absolute inset-0 bg-[#0c121d]/85 backdrop-blur-[2px] flex items-center justify-center z-30 cursor-pointer"
             >
-              <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-950/90 border border-emerald-500/60 px-3 py-1 rounded-lg animate-pulse shadow-lg flex items-center gap-1.5">
-                <span>⌨️</span> Yozish uchun bosing
+              <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-950/95 border border-emerald-500/60 px-4 py-1.5 rounded-xl animate-pulse shadow-lg flex items-center gap-2">
+                <span>📱</span> Yozish uchun bosing (Klaviatura)
               </span>
-            </div>
+            </button>
           )}
 
           {/* Countdown vaqtida ko'rsatma */}
