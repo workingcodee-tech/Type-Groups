@@ -518,13 +518,14 @@ export const WordsTypingArena: React.FC<WordsTypingArenaProps> = ({
             {[50, 100, 200, 500, 1000].map((dist) => (
               <button
                 key={dist}
-                disabled={countdownActive || (startTime !== null && !isFinished)}
+                type="button"
                 onClick={() => handleSelectDistance(dist)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
                   distance === dist
-                    ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)] font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                 }`}
+                title={`${dist} metr masofani tanlash`}
               >
                 {dist}m
               </button>

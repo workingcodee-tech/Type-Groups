@@ -1,129 +1,61 @@
 /**
- * 5000 ta tasodifiy inglizcha so'zlar generatori.
- * Saytga har safar kirganda yoki yangi xona ochilganda 5000 ta so'z random qilib shakllantiriladi.
+ * Oson va qulay so'zlar to'plami.
+ * Barcha so'zlar qisqa (2-5 ta harf), oddiy, oson yoziladigan va mashhur so'zlardan tashkil topgan.
+ * Murakkab, uzun va chalkash so'zlar olib tashlangan.
  */
 
-const BASE_ENGLISH_WORDS = [
-  "the", "be", "to", "of", "and", "a", "in", "that", "have", "i",
-  "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-  "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-  "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
-  "so", "up", "out", "if", "about", "who", "get", "which", "go", "me",
-  "when", "make", "can", "like", "time", "no", "just", "him", "know", "take",
-  "people", "into", "year", "your", "good", "some", "could", "them", "see", "other",
-  "than", "then", "now", "look", "only", "come", "its", "over", "think", "also",
-  "back", "after", "use", "two", "how", "our", "work", "first", "well", "way",
-  "even", "new", "want", "because", "any", "these", "give", "day", "most", "us",
-  "speed", "type", "keyboard", "drive", "track", "race", "shift", "power", "engine", "gear",
-  "turbo", "wheel", "fast", "velocity", "drift", "road", "highway", "motion", "energy", "force",
-  "system", "program", "code", "light", "screen", "build", "create", "quick", "finger", "focus",
-  "great", "world", "hand", "high", "place", "point", "next", "group", "team", "leader",
-  "champion", "number", "water", "sound", "line", "right", "too", "mean", "old", "same",
-  "tell", "boy", "follow", "came", "show", "around", "form", "three", "small", "set",
-  "end", "does", "another", "well", "large", "must", "big", "even", "such", "turn",
-  "here", "why", "ask", "went", "men", "read", "need", "land", "different", "home",
-  "move", "try", "kind", "hand", "picture", "again", "change", "off", "play", "spell",
-  "air", "away", "animal", "house", "page", "letter", "mother", "answer", "found", "study",
-  "still", "learn", "should", "america", "world", "street", "city", "tree", "cross", "since",
-  "hard", "start", "might", "story", "saw", "far", "sea", "draw", "left", "late",
-  "run", "press", "close", "night", "real", "life", "few", "north", "open", "seem",
-  "together", "next", "white", "children", "begin", "got", "walk", "example", "ease", "paper",
-  "always", "music", "those", "both", "mark", "often", "letter", "until", "mile", "river",
-  "car", "feet", "care", "second", "book", "carry", "took", "science", "eat", "room",
-  "friend", "began", "idea", "fish", "mountain", "stop", "once", "base", "hear", "horse",
-  "cut", "sure", "watch", "color", "face", "wood", "main", "enough", "plain", "girl",
-  "usual", "young", "ready", "above", "ever", "red", "list", "though", "feel", "talk",
-  "bird", "soon", "body", "dog", "family", "direct", "pose", "leave", "song", "measure",
-  "door", "product", "black", "short", "numeral", "class", "wind", "question", "happen", "complete",
-  "ship", "area", "half", "rock", "order", "fire", "south", "problem", "piece", "told",
-  "knew", "pass", "since", "top", "whole", "king", "space", "heard", "best", "hour",
-  "better", "true", "during", "hundred", "five", "remember", "step", "early", "hold", "west",
-  "ground", "interest", "reach", "fast", "verb", "sing", "listen", "six", "table", "travel",
-  "less", "morning", "ten", "simple", "several", "vowel", "toward", "war", "lay", "against",
-  "pattern", "slow", "center", "love", "person", "money", "serve", "appear", "road", "map",
-  "rain", "rule", "govern", "pull", "cold", "notice", "voice", "unit", "power", "town",
-  "fine", "certain", "fly", "fall", "lead", "cry", "dark", "machine", "note", "wait",
-  "plan", "figure", "star", "box", "noun", "field", "rest", "correct", "able", "pound",
-  "done", "beauty", "drive", "stood", "contain", "front", "teach", "week", "final", "gave",
-  "green", "quick", "develop", "ocean", "warm", "free", "minute", "strong", "special", "mind",
-  "behind", "clear", "tail", "produce", "fact", "space", "heard", "best", "hour", "better",
-  "true", "during", "hundred", "am", "remember", "step", "early", "hold", "west", "ground",
-  "interest", "reach", "fast", "verb", "sing", "listen", "six", "table", "travel", "less",
-  "morning", "ten", "simple", "several", "vowel", "toward", "war", "lay", "against", "pattern",
-  "slow", "center", "love", "person", "money", "serve", "appear", "road", "map", "rain",
-  "rule", "govern", "pull", "cold", "notice", "voice", "unit", "power", "town", "fine",
-  "certain", "fly", "fall", "lead", "cry", "dark", "machine", "note", "wait", "plan",
-  "figure", "star", "box", "noun", "field", "rest", "correct", "able", "pound", "done",
-  "beauty", "drive", "stood", "contain", "front", "teach", "week", "final", "gave", "green",
-  "oh", "quick", "develop", "ocean", "warm", "free", "minute", "strong", "special", "mind",
-  "behind", "clear", "tail", "produce", "fact", "street", "inch", "multiply", "nothing", "course",
-  "stay", "wheel", "full", "force", "blue", "object", "decide", "surface", "deep", "moon",
-  "island", "foot", "system", "busy", "test", "record", "boat", "common", "gold", "possible",
-  "plane", "stead", "dry", "wonder", "laugh", "thousand", "ago", "ran", "check", "game",
-  "shape", "equate", "hot", "miss", "brought", "heat", "snow", "tire", "bring", "yes",
-  "distant", "fill", "east", "paint", "language", "among", "grand", "ball", "yet", "wave",
-  "drop", "heart", "am", "present", "heavy", "dance", "engine", "position", "arm", "wide",
-  "sail", "material", "size", "vary", "settle", "speak", "weight", "general", "ice", "matter",
-  "circle", "pair", "include", "divide", "syllable", "felt", "perhaps", "pick", "sudden", "count",
-  "square", "reason", "length", "represent", "art", "subject", "region", "energy", "hunt", "probable",
-  "bed", "brother", "egg", "ride", "cell", "believe", "fraction", "forest", "sit", "race",
-  "window", "store", "summer", "train", "sleep", "prove", "lone", "leg", "exercise", "wall",
-  "catch", "mount", "wish", "sky", "board", "joy", "winter", "sat", "written", "wild",
-  "instrument", "kept", "glass", "grass", "cow", "job", "edge", "sign", "visit", "past",
-  "soft", "fun", "bright", "gas", "weather", "month", "million", "bear", "finish", "happy",
-  "hope", "flower", "clothe", "strange", "gone", "jump", "baby", "eight", "village", "meet",
-  "root", "buy", "raise", "solve", "metal", "whether", "push", "seven", "paragraph", "third",
-  "shall", "held", "hair", "describe", "cook", "floor", "either", "result", "burn", "hill",
-  "safe", "cat", "century", "consider", "type", "law", "bit", "coast", "copy", "phrase",
-  "silent", "tall", "sand", "soil", "roll", "temperature", "finger", "industry", "value", "fight",
-  "lie", "beat", "excite", "natural", "view", "sense", "ear", "else", "quite", "broke",
-  "case", "middle", "kill", "son", "lake", "moment", "scale", "loud", "spring", "observe",
-  "child", "straight", "consonant", "nation", "dictionary", "milk", "speed", "method", "organ", "pay",
-  "age", "section", "dress", "cloud", "surprise", "quiet", "stone", "tiny", "climb", "cool",
-  "design", "poor", "lot", "experiment", "bottom", "key", "iron", "single", "stick", "flat",
-  "twenty", "skin", "smile", "crease", "hole", "trade", "melody", "trip", "office", "receive",
-  "row", "mouth", "exact", "symbol", "die", "least", "trouble", "shout", "except", "wrote",
-  "seed", "tone", "join", "suggest", "clean", "break", "lady", "yard", "rise", "bad",
-  "blow", "oil", "blood", "touch", "grew", "cent", "mix", "team", "wire", "cost",
-  "lost", "brown", "wear", "garden", "equal", "sent", "choose", "fell", "fit", "flow",
-  "fair", "bank", "collect", "save", "control", "decimal", "gentle", "woman", "captain", "practice",
-  "separate", "difficult", "doctor", "please", "protect", "noon", "whose", "locate", "ring", "character",
-  "insect", "caught", "period", "indicate", "radio", "spoke", "atom", "human", "history", "effect",
-  "electric", "expect", "crop", "modern", "element", "hit", "student", "corner", "party", "supply",
-  "bone", "rail", "imagine", "provide", "agree", "thus", "capital", "chair", "danger", "fruit",
-  "rich", "thick", "soldier", "process", "operate", "guess", "necessary", "sharp", "wing", "create",
-  "neighbor", "wash", "bat", "rather", "crowd", "corn", "compare", "poem", "string", "bell",
-  "depend", "meat", "rub", "tube", "famous", "dollar", "stream", "fear", "sight", "thin",
-  "triangle", "planet", "hurry", "chief", "colony", "clock", "mine", "tie", "enter", "major",
-  "fresh", "search", "send", "yellow", "gun", "allow", "print", "dead", "spot", "desert",
-  "suit", "current", "lift", "rose", "continue", "block", "chart", "hat", "sell", "success",
-  "company", "subtract", "event", "particular", "deal", "swim", "term", "opposite", "wife", "shoe",
-  "shoulder", "spread", "arrange", "camp", "invent", "cotton", "born", "determine", "quart", "nine",
-  "truck", "noise", "level", "chance", "gather", "shop", "stretch", "throw", "shine", "property",
-  "column", "molecule", "select", "wrong", "gray", "repeat", "require", "broad", "prepare", "salt",
-  "nose", "plural", "anger", "claim", "continent", "oxygen", "sugar", "death", "pretty", "skill",
-  "women", "season", "solution", "magnet", "silver", "thank", "branch", "match", "suffix", "especially",
-  "fig", "afraid", "huge", "sister", "steel", "discuss", "forward", "similar", "guide", "experience",
-  "score", "apple", "bought", "led", "pitch", "coat", "mass", "card", "band", "rope",
-  "slip", "win", "dream", "evening", "condition", "feed", "tool", "total", "basic", "smell",
-  "valley", "nor", "double", "seat", "arrive", "master", "track", "parent", "shore", "division",
-  "sheet", "substance", "favor", "connect", "post", "spend", "chord", "fat", "glad", "original",
-  "share", "station", "dad", "bread", "charge", "proper", "bar", "offer", "segment", "slave",
-  "duck", "instant", "market", "degree", "populate", "chick", "dear", "enemy", "reply", "drink",
-  "occur", "support", "speech", "nature", "range", "steam", "motion", "path", "liquid", "log",
-  "meant", "quotient", "teeth", "shell", "neck"
+const EASY_WORDS = [
+  // 1. Eng ommabop va juda oson so'zlar (2-3 harfli)
+  "the", "be", "to", "of", "and", "a", "in", "it", "for", "not", "on", "he", "as", "you", "do", "at",
+  "by", "we", "say", "her", "she", "or", "an", "my", "one", "all", "so", "up", "out", "if", "who",
+  "get", "go", "me", "can", "no", "him", "see", "now", "day", "use", "two", "how", "our", "way",
+  "new", "any", "day", "us", "run", "car", "red", "big", "win", "top", "fun", "hot", "sun", "sky",
+  "air", "sea", "ice", "key", "box", "dog", "cat", "bus", "cup", "pen", "boy", "men", "man", "eye",
+  "arm", "leg", "bad", "bed", "fly", "far", "fit", "hit", "job", "joy", "low", "map", "oil", "old",
+  "raw", "row", "tax", "tea", "yes", "yet", "fox", "hat", "cap", "bag", "bat", "bit", "cut", "dry",
+  "egg", "end", "fan", "few", "gas", "gun", "guy", "kid", "lip", "mix", "net", "pan", "pay", "pet",
+  "pie", "pig", "pot", "ray", "rib", "sad", "set", "six", "son", "spy", "tap", "ten", "tie", "tin",
+  "tip", "toe", "toy", "war", "wet", "zoo", "bar", "cow", "cry", "dad", "dig", "dot", "ear", "eat",
+
+  // 2. Oson va tez yoziladigan 4 harfli so'zlar
+  "that", "have", "with", "this", "from", "they", "will", "would", "what", "make", "like", "time",
+  "just", "know", "take", "into", "year", "your", "good", "some", "them", "than", "then", "look",
+  "only", "come", "over", "also", "back", "well", "even", "want", "give", "most", "fast", "race",
+  "auto", "cars", "road", "gear", "turn", "park", "jump", "ride", "fuel", "tank", "lane", "line",
+  "stop", "move", "pace", "heat", "tire", "apex", "dash", "rush", "zoom", "play", "game", "team",
+  "star", "fire", "city", "gold", "free", "life", "easy", "cool", "safe", "nice", "luck", "baby",
+  "milk", "food", "best", "open", "walk", "song", "dark", "face", "test", "real", "keep", "help",
+  "bird", "fish", "boat", "high", "rock", "head", "rich", "warm", "full", "hard", "pass", "true",
+  "love", "self", "town", "word", "form", "land", "farm", "ball", "ring", "care", "card", "view",
+  "hold", "rule", "plan", "fact", "past", "unit", "lead", "rest", "mind", "feet", "side", "draw",
+  "hope", "drop", "step", "snow", "rain", "hall", "shop", "hill", "wind", "blue", "tree", "moon",
+  "door", "room", "book", "home", "hand", "hero", "live", "kind", "feel", "talk", "soon", "body",
+  "page", "wish", "mark", "hour", "five", "send", "stay", "deep", "busy", "foot", "gold", "late",
+
+  // 3. Qulay poyga va avtomobil mavzusidagi 4-5 harfli so'zlar
+  "speed", "drive", "track", "shift", "drift", "turbo", "boost", "nitro", "motor", "wheel", "power",
+  "sport", "rider", "steer", "racer", "spark", "start", "check", "clean", "fresh", "green", "white",
+  "black", "light", "super", "ready", "sound", "smart", "quick", "focus", "clear", "point", "champ",
+  "flash", "drive", "pilot", "pedal", "clutch", "brake", "meter", "gauge", "score", "level", "crown",
+
+  // 4. Kundalik mashhur 5 harfli oson so'zlar
+  "about", "which", "there", "their", "could", "other", "think", "after", "first", "great", "world",
+  "water", "house", "place", "right", "small", "every", "found", "still", "learn", "story", "never",
+  "leave", "plant", "stand", "start", "night", "state", "close", "under", "story", "while", "press",
+  "study", "since", "build", "earth", "stand", "happy", "money", "serve", "month", "space", "piece",
+  "heart", "music", "color", "party", "front", "river", "voice", "stand", "table", "horse", "watch"
 ];
 
 /**
- * 5000 ta (yoki belgilangan miqdorda) tasodifiy so'zlar ro'yxatini hosil qiladi
+ * Tasodifiy oson so'zlar ro'yxatini hosil qiladi
  */
 export function generate5000Words(count: number = 5000): string[] {
   const result: string[] = [];
-  const len = BASE_ENGLISH_WORDS.length;
+  const len = EASY_WORDS.length;
   const targetCount = Math.max(1, count);
   for (let i = 0; i < targetCount; i++) {
     const randomIndex = Math.floor(Math.random() * len);
-    result.push(BASE_ENGLISH_WORDS[randomIndex]);
+    result.push(EASY_WORDS[randomIndex]);
   }
   return result;
 }

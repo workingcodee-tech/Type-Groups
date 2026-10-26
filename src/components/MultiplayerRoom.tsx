@@ -51,6 +51,30 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       const data = snapshot.data();
       setRoomData(data);
 
+      // Server tomonidan boshqariladigan sinxron 3-2-1 START (barcha a'zolarda bir vaqtda ishlaydi)
+      if (data.status === 'starting') {
+        if (typeof data.countdown === 'number') {
+          setCountdown(data.countdown);
+          if (data.countdown !== playedCountdownRef.current) {
+            playedCountdownRef.current = data.countdown;
+            sounds.playCountdown(data.countdown);
+          }
+        }
+      } else if (data.status === 'racing') {
+        if (data.countdown === 0) {
+          setCountdown(0);
+          if (playedCountdownRef.current !== 0) {
+            playedCountdownRef.current = 0;
+            sounds.playCountdown(0);
+          }
+        } else {
+          setCountdown(null);
+        }
+      } else {
+        setCountdown(null);
+        playedCountdownRef.current = null;
+      }
+
       // Agar yangi bosqich boshlangan bo'lsa (round o'zgardi):
       if (data.round && data.round !== lastRoundRef.current) {
         lastRoundRef.current = data.round;
@@ -128,72 +152,16 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     };
   }, [roomId, myId]);
 
-  // 3. Sinxron va qotib qolmaydigan (anti-freeze) 3-2-1 START hisoblagich
+  // 3. Favqulodda xavfsizlik nazoratchisi (Watchdog):
+  // Agar tarmoqda signal kechiksa ham har bir o'yinchida hisoblagich avtomatik 1.2 soniyada pasayib poyga boshlanadi
   useEffect(() => {
-    // Agar status 'racing' bo'lsa (poyga allaqachon ketmoqda), countdown darhol tugaydi
-    if (roomData?.status === 'racing') {
-      setCountdown(null);
-      playedCountdownRef.current = null;
-      return;
+    if (roomData?.status === 'starting' && countdown !== null && countdown > 0) {
+      const fallbackTimer = window.setTimeout(() => {
+        setCountdown((prev) => (prev !== null && prev > 1 ? prev - 1 : 0));
+      }, 1300);
+      return () => clearTimeout(fallbackTimer);
     }
-
-    // Faqat 'starting' holatida hisoblagich ishlaydi
-    if (roomData?.status !== 'starting') {
-      setCountdown(null);
-      playedCountdownRef.current = null;
-      return;
-    }
-
-    const now = Date.now();
-    const serverStartMs = roomData?.startTimeMs;
-    // Qurilmalar o'rtasidagi soat tafovutini (skew) bartaraf etish:
-    // Agar server vaqti juda katta yoki o'tib ketgan bo'lsa, mahalliy 3.4 soniyalik aniq taymer ishlatiladi
-    const diff = serverStartMs ? serverStartMs - now : 3400;
-    const targetEndTime = (diff > 0 && diff <= 4500) ? serverStartMs : (now + 3400);
-
-    // Xavfsizlik nazoratchisi (Watchdog): Mobil qurilma hech qachon '3' da qotib qolmasligini 100% kafolatlaydi!
-    const watchdog = window.setTimeout(() => {
-      setCountdown(null);
-    }, 4000);
-
-    const syncInterval = window.setInterval(() => {
-      const remainingMs = targetEndTime - Date.now();
-
-      if (remainingMs > 2000) {
-        setCountdown(3);
-        if (playedCountdownRef.current !== 3) {
-          playedCountdownRef.current = 3;
-          sounds.playCountdown(3);
-        }
-      } else if (remainingMs > 1000) {
-        setCountdown(2);
-        if (playedCountdownRef.current !== 2) {
-          playedCountdownRef.current = 2;
-          sounds.playCountdown(2);
-        }
-      } else if (remainingMs > 0) {
-        setCountdown(1);
-        if (playedCountdownRef.current !== 1) {
-          playedCountdownRef.current = 1;
-          sounds.playCountdown(1);
-        }
-      } else if (remainingMs > -700) {
-        // Start signali: 0 -> GO!
-        setCountdown(0);
-        if (playedCountdownRef.current !== 0) {
-          playedCountdownRef.current = 0;
-          sounds.playCountdown(0);
-        }
-      } else {
-        setCountdown(null);
-      }
-    }, 40);
-
-    return () => {
-      clearInterval(syncInterval);
-      clearTimeout(watchdog);
-    };
-  }, [roomData?.status, roomData?.startTimeMs]);
+  }, [roomData?.status, countdown]);
 
   // Foydalanuvchi yozayotgan paytda progressni bazaga yuborish
   const handleProgressUpdate = React.useCallback(async (progress: number, wpm: number, accuracy: number, totalChars: number, errors: number) => {
@@ -274,29 +242,50 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
     }
   };
 
-  // 1-bosqich: Birinchi poygani boshlash (Faqat xona yaratuvchisi boshlaydi)
+  // 1-bosqich: Birinchi poygani boshlash (Faqat xona yaratuvchisi boshlaydi va barcha qurilmalar bir vaqtda start oladi)
   const handleStartRace = async () => {
     if (!isCreator) return;
     try {
       const roomRef = doc(db, 'rooms', roomId);
-      // Barcha a'zolarga yetib borishi va aniq bir xil vaqtda start olishi uchun 3.5 soniya hisoblanadi
-      const startMs = Date.now() + 3500;
+
+      // 1-qadam: 3 soniya (barcha a'zolarda bir vaqtda 3 paydo bo'ladi)
       await updateDoc(roomRef, {
         status: 'starting',
-        startTimeMs: startMs,
+        countdown: 3,
         startedAt: new Date().toISOString()
       });
 
-      // 3.5 soniyadan so'ng poyga holati 'racing' ga o'tadi (barcha mobil va kompyuter a'zolarida bir paytda start oladi)
+      // 2-qadam: 1 soniyadan so'ng 2 raqami
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, { countdown: 2 });
+        } catch {}
+      }, 1000);
+
+      // 3-qadam: 2 soniyadan so'ng 1 raqami
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, { countdown: 1 });
+        } catch {}
+      }, 2000);
+
+      // 4-qadam: 3 soniyadan so'ng START (GO! 🏁) - barcha qurilmalarda bir xil paytda boshlanadi
       window.setTimeout(async () => {
         try {
           await updateDoc(roomRef, {
-            status: 'racing'
+            status: 'racing',
+            countdown: 0,
+            racingStartedAt: Date.now()
           });
-        } catch {
-          // ignore
-        }
-      }, 3500);
+        } catch {}
+      }, 3000);
+
+      // 5-qadam: 3.8 soniyadan so'ng GO bannerini yopish
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, { countdown: null });
+        } catch {}
+      }, 3800);
     } catch (e) {
       console.warn("Poygani boshlashda xatolik:", e);
     }
@@ -312,7 +301,6 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       const targetWordsCount = Math.max(30, Math.ceil(targetMeters / 4));
       const newWords = generate5000Words(targetWordsCount);
       const nextRoundNumber = (roomData?.round || 1) + 1;
-      const nextStartMs = Date.now() + 3500;
 
       // Barcha ishtirokchilarning natijalarini tozalash (reset qilish)
       const participantsRef = collection(db, 'rooms', roomId, 'participants');
@@ -334,27 +322,48 @@ export const MultiplayerRoom: React.FC<MultiplayerRoomProps> = ({
       );
       await Promise.all(resetPromises);
 
-      // Xonaga yangi so'zlarni yuklash va sinxron start vaqtini o'rnatish
+      // Xonaga yangi so'zlarni yuklash va sinxron start berish
       const roomRef = doc(db, 'rooms', roomId);
       await updateDoc(roomRef, {
         words: newWords,
         round: nextRoundNumber,
         status: 'starting',
-        startTimeMs: nextStartMs,
+        countdown: 3,
         startedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
-      // 3.5 soniyadan so'ng barcha o'yinchilar uchun poyga start oladi
+      // 1000ms dan so'ng: 2
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, { countdown: 2 });
+        } catch {}
+      }, 1000);
+
+      // 2000ms dan so'ng: 1
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, { countdown: 1 });
+        } catch {}
+      }, 2000);
+
+      // 3000ms dan so'ng: START!
       window.setTimeout(async () => {
         try {
           await updateDoc(roomRef, {
-            status: 'racing'
+            status: 'racing',
+            countdown: 0,
+            racingStartedAt: Date.now()
           });
-        } catch {
-          // ignore
-        }
-      }, 3500);
+        } catch {}
+      }, 3000);
+
+      // 3800ms dan so'ng banner yopiladi
+      window.setTimeout(async () => {
+        try {
+          await updateDoc(roomRef, { countdown: null });
+        } catch {}
+      }, 3800);
     } catch (e) {
       console.warn("Keyingi bosqichga o'tishda xatolik:", e);
     } finally {

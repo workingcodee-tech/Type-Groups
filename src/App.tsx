@@ -88,18 +88,34 @@ export default function App() {
     }
   };
 
+  const [soloDistance, setSoloDistance] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tg_user_dist');
+      return saved ? Number(saved) : 100;
+    } catch {
+      return 100;
+    }
+  });
+
   // Yakka poyga boshlash
-  const handleStartSolo = (userName: string, carId: string, difficulty: DifficultyLevel = 'medium') => {
+  const handleStartSolo = (
+    userName: string,
+    carId: string,
+    difficulty: DifficultyLevel = 'medium',
+    distance: number = 100
+  ) => {
     setCurrentUser((prev) => ({
       ...prev,
       name: userName,
       carId
     }));
     setSoloDifficulty(difficulty);
+    setSoloDistance(distance);
     try {
       localStorage.setItem('tg_user_name', userName);
       localStorage.setItem('tg_user_car', carId);
       localStorage.setItem('tg_user_diff', difficulty);
+      localStorage.setItem('tg_user_dist', distance.toString());
     } catch {
       // ignore
     }
@@ -292,6 +308,7 @@ export default function App() {
               userName={currentUser.name}
               carId={currentUser.carId}
               initialDifficulty={soloDifficulty}
+              initialDistance={soloDistance}
               onBack={() => setViewState('home')}
               onOpenMultiplayer={() => setMultiplayerModalMode('join')}
               onChangeCar={(newCarId) => setCurrentUser(prev => ({ ...prev, carId: newCarId }))}

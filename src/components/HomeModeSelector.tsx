@@ -12,7 +12,7 @@ interface HomeModeSelectorProps {
     carId: string;
   };
   onUpdateUser: (name: string, carId: string) => void;
-  onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel) => void;
+  onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel, distance?: number) => void;
   onJoinGroup: (roomId: string, userName: string, carId: string) => void;
   onCreateGroup: (groupName: string, userName: string, carId: string, targetDistance?: number) => void;
   soundType: SwitchSoundType;
@@ -33,6 +33,14 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
   const [name, setName] = useState<string>(currentUser.name || 'Poygachi');
   const [selectedCarId, setSelectedCarId] = useState<string>(currentUser.carId || 'bmw');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
+  const [soloDistance, setSoloDistance] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tg_user_dist');
+      return saved ? Number(saved) : 100;
+    } catch {
+      return 100;
+    }
+  });
   const [groupName, setGroupName] = useState<string>('Tezkor Poygachilar');
   const [targetDistance, setTargetDistance] = useState<number>(100);
   const [joinPin, setJoinPin] = useState<string>(initialRoomId);
@@ -81,7 +89,12 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
   const handleSoloClick = () => {
     const validName = getCleanName();
     if (!validName) return;
-    onStartSolo(validName, selectedCarId, difficulty);
+    try {
+      localStorage.setItem('tg_user_dist', soloDistance.toString());
+    } catch {
+      // ignore
+    }
+    onStartSolo(validName, selectedCarId, difficulty, soloDistance);
   };
 
   const handleCreateClick = (e: React.FormEvent) => {
@@ -288,6 +301,41 @@ export const HomeModeSelector: React.FC<HomeModeSelectorProps> = ({
                 >
                   🔴 Qiyin
                 </button>
+              </div>
+            </div>
+
+            {/* Masofani tanlash: 50m, 100m, 200m, 500m, 1000m */}
+            <div className="space-y-1 mt-2.5 mb-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Poyga Masofasi:
+                </span>
+                <span className="text-[10px] font-mono font-bold text-emerald-400">
+                  {soloDistance} metr
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-1">
+                {[50, 100, 200, 500, 1000].map((dist) => (
+                  <button
+                    key={dist}
+                    type="button"
+                    onClick={() => {
+                      setSoloDistance(dist);
+                      try {
+                        localStorage.setItem('tg_user_dist', dist.toString());
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    className={`py-1 text-center rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer ${
+                      soloDistance === dist
+                        ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-slate-950 font-black border-emerald-300 shadow-sm shadow-emerald-500/30'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    {dist}m
+                  </button>
+                ))}
               </div>
             </div>
           </div>

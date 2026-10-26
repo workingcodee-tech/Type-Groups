@@ -15,6 +15,7 @@ interface SoloRaceArenaProps {
   userName: string;
   carId: string;
   initialDifficulty?: DifficultyLevel;
+  initialDistance?: number;
   onBack?: () => void;
   onOpenMultiplayer?: () => void;
   onChangeCar?: (newCarId: string) => void;
@@ -46,6 +47,7 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
   userName,
   carId,
   initialDifficulty = 'medium',
+  initialDistance = 100,
   onBack,
   onOpenMultiplayer,
   onChangeCar,
@@ -61,8 +63,15 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
   const [isNameModalOpen, setIsNameModalOpen] = useState<boolean>(false);
   const [tempName, setTempName] = useState<string>(userName);
 
-  const [selectedDistance, setSelectedDistance] = useState<number>(100);
+  const [selectedDistance, setSelectedDistance] = useState<number>(initialDistance);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>(initialDifficulty);
+
+  // initialDistance o'zgarganda yangilash
+  useEffect(() => {
+    if (initialDistance && initialDistance !== selectedDistance) {
+      setSelectedDistance(initialDistance);
+    }
+  }, [initialDistance]);
 
   // 3-2-1 Countdown holati
   const [countdown, setCountdown] = useState<number | null>(3);
@@ -269,9 +278,15 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
 
   const handleDistanceChange = useCallback((dist: number) => {
     setSelectedDistance(dist);
+    try {
+      localStorage.setItem('tg_user_dist', dist.toString());
+    } catch {
+      // ignore
+    }
     setRaceStats(null);
     setShowCelebration(false);
     setShowDetailedModal(false);
+    setWordsList(generate5000Words());
     startCountdown();
   }, [startCountdown]);
 
@@ -418,10 +433,25 @@ export const SoloRaceArena: React.FC<SoloRaceArenaProps> = ({
             </button>
           )}
 
-          {/* Tanlangan Masofa */}
-          <span className="px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-bold text-[11px]">
-            🏁 {selectedDistance}m
-          </span>
+          {/* Masofani almashtirish (50, 100, 200, 500, 1000m) */}
+          <div className="flex items-center p-0.5 bg-slate-900/90 border border-slate-800 rounded-xl text-[10px] font-mono font-bold">
+            <span className="hidden sm:inline text-slate-500 pl-1.5 pr-0.5 text-[9px] font-sans">Masofa:</span>
+            {[50, 100, 200, 500, 1000].map((dist) => (
+              <button
+                key={dist}
+                type="button"
+                onClick={() => handleDistanceChange(dist)}
+                className={`px-1.5 py-0.5 rounded-lg transition-all cursor-pointer ${
+                  selectedDistance === dist
+                    ? 'bg-gradient-to-r from-emerald-400 to-green-500 text-slate-950 font-black shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title={`${dist} metr masofadagi poyga`}
+              >
+                {dist}m
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ export type ModeType = 'solo' | 'join' | 'create';
 interface ModeModalProps {
   mode: ModeType | null;
   onClose: () => void;
-  onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel) => void;
+  onStartSolo: (userName: string, carId: string, difficulty: DifficultyLevel, distance?: number) => void;
   onJoinGroup: (roomId: string, userName: string, carId: string) => void;
   onCreateGroup: (groupName: string, userName: string, carId: string, targetDistance?: number) => void;
 }
@@ -53,7 +53,7 @@ export const ModeModal: React.FC<ModeModalProps> = ({
     }
 
     if (mode === 'solo') {
-      onStartSolo(userName.trim(), selectedCarId, difficulty);
+      onStartSolo(userName.trim(), selectedCarId, difficulty, targetDistance);
     } else if (mode === 'join') {
       const cleanId = roomIdInput.trim();
       if (!cleanId || cleanId.length !== 6) {
@@ -136,8 +136,8 @@ export const ModeModal: React.FC<ModeModalProps> = ({
                   </label>
                   <span className="text-[11px] font-mono font-bold text-cyan-400">{targetDistance} metr</span>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[50, 100, 200, 500].map((dist) => (
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[50, 100, 200, 500, 1000].map((dist) => (
                     <button
                       key={dist}
                       type="button"
